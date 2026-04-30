@@ -5,16 +5,19 @@ using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
 using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
+using PriceWatch.Application.UseCases.Notification;
 using PriceWatch.Application.UseCases.ProductList;
 using PriceWatch.Application.UseCases.TrackedProduct;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
 using PriceWatch.Infrastructure.Email;
 using PriceWatch.Infrastructure.Fetchers;
+using PriceWatch.Infrastructure.Messaging;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Repositories;
 using PriceWatch.Infrastructure.Security;
 using PriceWatch.Infrastructure.Settings;
 using PriceWatch.Infrastructure.Workers;
+using StackExchange.Redis;
 
 namespace PriceWatch.API.Extensions;
 
@@ -27,7 +30,7 @@ public static class ServiceCollectionExtensions
         services
             .AddMongoDb(configuration)
             .AddJwtAuth(configuration)
-            .AddInfrastructure()
+            .AddInfrastructure(configuration)
             .AddUseCases();
 
         return services;
@@ -83,12 +86,11 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    private static IServiceCollection AddInfrastructure(this IServiceCollection services)
+    private static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
-        services.Configure<SmtpSettings>(
-            services.BuildServiceProvider()
-                .GetRequiredService<IConfiguration>()
-                .GetSection("Smtp"));
+        services.Configure<SmtpSettings>(configuration.GetSection("Smtp"));
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
@@ -105,6 +107,17 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPriceFetcherResolver, PriceFetcherResolver>();
         services.AddHttpClient<MercadoLivreFetcher>();
         services.AddHostedService<PriceCheckWorker>();
+
+        // Notification
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.Configure<RedisSettings>(configuration.GetSection("Redis"));
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+        {
+            var settings = sp.GetRequiredService<IOptions<RedisSettings>>().Value;
+            return ConnectionMultiplexer.Connect(settings.ConnectionString);
+        });
+        services.AddScoped<IAlertPublisher, RedisStreamPublisher>();
+        services.AddHostedService<RedisStreamConsumer>();
 
         return services;
     }
@@ -129,6 +142,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<UpdateProductUseCase>();
         services.AddScoped<RemoveProductUseCase>();
         services.AddScoped<GetPriceHistoryUseCase>();
+
+        // Notification
+        services.AddScoped<GetNotificationsUseCase>();
+        services.AddScoped<MarkAsReadUseCase>();
+        services.AddScoped<MarkAllAsReadUseCase>();
+        services.AddScoped<ProcessAlertUseCase>();
 
         return services;
     }

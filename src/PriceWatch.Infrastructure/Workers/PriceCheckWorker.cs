@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using PriceWatch.Domain.Enums;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
 
@@ -40,6 +41,7 @@ public class PriceCheckWorker : BackgroundService
         var productRepo = scope.ServiceProvider.GetRequiredService<ITrackedProductRepository>();
         var snapshotRepo = scope.ServiceProvider.GetRequiredService<IPriceSnapshotRepository>();
         var fetchers = scope.ServiceProvider.GetRequiredService<IEnumerable<IPriceFetcher>>();
+        var alertPublisher = scope.ServiceProvider.GetRequiredService<IAlertPublisher>();
 
         var dueProducts = await productRepo.GetDueForCheckAsync();
 
@@ -61,9 +63,10 @@ public class PriceCheckWorker : BackgroundService
                 await snapshotRepo.CreateAsync(snapshot);
                 await productRepo.UpdateAsync(product);
 
-                // TODO: publish alert when IAlertPublisher is available (domain-notification)
-                // if (product.ShouldTriggerTargetAlert() || product.ShouldTriggerLowestAlert(previousLowest))
-                //     await alertPublisher.PublishAsync(product.Id, product.UserId, product.Name, type, price);
+                if (product.ShouldTriggerTargetAlert())
+                    await alertPublisher.PublishAsync(product.Id, product.UserId, product.Name, NotificationType.TargetPriceReached, price);
+                else if (product.ShouldTriggerLowestAlert(previousLowest))
+                    await alertPublisher.PublishAsync(product.Id, product.UserId, product.Name, NotificationType.NewLowestPrice, price);
             }
             catch (Exception ex)
             {
