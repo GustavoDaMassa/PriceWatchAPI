@@ -35,4 +35,22 @@ public class SmtpEmailSender : IEmailSender
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
     }
+
+    public async Task SendAlertEmailAsync(string email, string subject, string body)
+    {
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse(_settings.From));
+        message.To.Add(MailboxAddress.Parse(email));
+        message.Subject = subject;
+        message.Body = new TextPart("plain") { Text = body };
+
+        using var client = new SmtpClient();
+        await client.ConnectAsync(_settings.Host, _settings.Port, false);
+
+        if (!string.IsNullOrEmpty(_settings.User) && !string.IsNullOrEmpty(_settings.Password))
+            await client.AuthenticateAsync(_settings.User, _settings.Password);
+
+        await client.SendAsync(message);
+        await client.DisconnectAsync(true);
+    }
 }
