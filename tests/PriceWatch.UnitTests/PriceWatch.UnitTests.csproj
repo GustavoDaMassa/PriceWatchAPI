@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\PriceWatch.Domain\PriceWatch.Domain.csproj" />
     <ProjectReference Include="..\..\src\PriceWatch.Application\PriceWatch.Application.csproj" />
+    <ProjectReference Include="..\..\src\PriceWatch.Infrastructure\PriceWatch.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
