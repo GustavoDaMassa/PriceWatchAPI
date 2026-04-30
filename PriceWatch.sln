@@ -1,0 +1,64 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6158D0FA-BB3D-410A-A40A-E3DB6E5ECD30}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriceWatch.Domain", "src\PriceWatch.Domain\PriceWatch.Domain.csproj", "{952537C7-883C-4D35-B0B8-E1C0B20D89B3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriceWatch.Application", "src\PriceWatch.Application\PriceWatch.Application.csproj", "{5A5D0BD6-9309-4FDF-9D27-E4ACB8DD66FF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriceWatch.Infrastructure", "src\PriceWatch.Infrastructure\PriceWatch.Infrastructure.csproj", "{A688CACE-2341-4C3C-8719-4844D316BAC3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriceWatch.API", "src\PriceWatch.API\PriceWatch.API.csproj", "{A6B22D95-113B-4E22-889F-D7CA54CFB8A6}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{513B2475-15FE-4837-BEA4-A5BCFEF5FDF6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriceWatch.UnitTests", "tests\PriceWatch.UnitTests\PriceWatch.UnitTests.csproj", "{1BFE922A-556F-4A37-8843-1A3D2FFF4C04}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriceWatch.IntegrationTests", "tests\PriceWatch.IntegrationTests\PriceWatch.IntegrationTests.csproj", "{E1827977-0F39-43CE-A195-A7824196B11D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{952537C7-883C-4D35-B0B8-E1C0B20D89B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{952537C7-883C-4D35-B0B8-E1C0B20D89B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{952537C7-883C-4D35-B0B8-E1C0B20D89B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{952537C7-883C-4D35-B0B8-E1C0B20D89B3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5A5D0BD6-9309-4FDF-9D27-E4ACB8DD66FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5A5D0BD6-9309-4FDF-9D27-E4ACB8DD66FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5A5D0BD6-9309-4FDF-9D27-E4ACB8DD66FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5A5D0BD6-9309-4FDF-9D27-E4ACB8DD66FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A688CACE-2341-4C3C-8719-4844D316BAC3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A688CACE-2341-4C3C-8719-4844D316BAC3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A688CACE-2341-4C3C-8719-4844D316BAC3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A688CACE-2341-4C3C-8719-4844D316BAC3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6B22D95-113B-4E22-889F-D7CA54CFB8A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6B22D95-113B-4E22-889F-D7CA54CFB8A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6B22D95-113B-4E22-889F-D7CA54CFB8A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6B22D95-113B-4E22-889F-D7CA54CFB8A6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1BFE922A-556F-4A37-8843-1A3D2FFF4C04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1BFE922A-556F-4A37-8843-1A3D2FFF4C04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1BFE922A-556F-4A37-8843-1A3D2FFF4C04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1BFE922A-556F-4A37-8843-1A3D2FFF4C04}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E1827977-0F39-43CE-A195-A7824196B11D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1827977-0F39-43CE-A195-A7824196B11D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1827977-0F39-43CE-A195-A7824196B11D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1827977-0F39-43CE-A195-A7824196B11D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{952537C7-883C-4D35-B0B8-E1C0B20D89B3} = {6158D0FA-BB3D-410A-A40A-E3DB6E5ECD30}
+		{5A5D0BD6-9309-4FDF-9D27-E4ACB8DD66FF} = {6158D0FA-BB3D-410A-A40A-E3DB6E5ECD30}
+		{A688CACE-2341-4C3C-8719-4844D316BAC3} = {6158D0FA-BB3D-410A-A40A-E3DB6E5ECD30}
+		{A6B22D95-113B-4E22-889F-D7CA54CFB8A6} = {6158D0FA-BB3D-410A-A40A-E3DB6E5ECD30}
+		{1BFE922A-556F-4A37-8843-1A3D2FFF4C04} = {513B2475-15FE-4837-BEA4-A5BCFEF5FDF6}
+		{E1827977-0F39-43CE-A195-A7824196B11D} = {513B2475-15FE-4837-BEA4-A5BCFEF5FDF6}
+	EndGlobalSection
+EndGlobal
