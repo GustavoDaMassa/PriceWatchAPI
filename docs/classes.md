@@ -72,6 +72,17 @@
 </blockquote>
 </details>
 
+<details id="Notification">
+<summary><strong><a href="../src/PriceWatch.Domain/Entities/Notification.cs">Notification.cs</a> [class]</strong></summary>
+<blockquote>
+
+**atributos:** `Id`, `UserId`, `ProductId`, `ProductName`, `Type`, `Message`, `IsRead`, `CreatedAt` — todos `private set`
+
+**métodos:** `Create(userId, productId, productName, type, currentPrice)` — gera Message pelo type; `Restore(...)`, `MarkAsRead()`
+
+</blockquote>
+</details>
+
 </blockquote>
 </details>
 
@@ -80,6 +91,7 @@
 <blockquote>
 
 - [ProductSource.cs](../src/PriceWatch.Domain/Enums/ProductSource.cs) — `MercadoLivre, Kabum, Manual`
+- [NotificationType.cs](../src/PriceWatch.Domain/Enums/NotificationType.cs) — `TargetPriceReached, NewLowestPrice`
 
 </blockquote>
 </details>
@@ -129,6 +141,28 @@
 
 <details id="ProductListNotFoundException">
 <summary><strong><a href="../src/PriceWatch.Domain/Exceptions/ProductListNotFoundException.cs">ProductListNotFoundException.cs</a> [class]</strong></summary>
+<blockquote>
+
+**extends:** [NotFoundException](#NotFoundException)
+
+**construtor:** `(string identifier)`
+
+</blockquote>
+</details>
+
+<details id="TrackedProductNotFoundException2">
+<summary><strong><a href="../src/PriceWatch.Domain/Exceptions/TrackedProductNotFoundException.cs">TrackedProductNotFoundException.cs</a> [class]</strong></summary>
+<blockquote>
+
+**extends:** [NotFoundException](#NotFoundException)
+
+**construtor:** `(string identifier)`
+
+</blockquote>
+</details>
+
+<details id="NotificationNotFoundException">
+<summary><strong><a href="../src/PriceWatch.Domain/Exceptions/NotificationNotFoundException.cs">NotificationNotFoundException.cs</a> [class]</strong></summary>
 <blockquote>
 
 **extends:** [NotFoundException](#NotFoundException)
@@ -192,6 +226,7 @@
 - [ITokenService.cs](../src/PriceWatch.Domain/Interfaces/Services/ITokenService.cs) — `GenerateToken(user)`
 - [IEmailSender.cs](../src/PriceWatch.Domain/Interfaces/Services/IEmailSender.cs) — `SendVerificationEmailAsync(email, name, token)`
 - [IPriceFetcher.cs](../src/PriceWatch.Domain/Interfaces/Services/IPriceFetcher.cs) — `string Source { get; }`, `FetchAsync(url) → decimal`
+- [IAlertPublisher.cs](../src/PriceWatch.Domain/Interfaces/Services/IAlertPublisher.cs) — `PublishAsync(productId, userId, productName, type, currentPrice)`
 
 </blockquote>
 </details>
@@ -243,6 +278,16 @@
 - [UpdateProductRequest.cs](../src/PriceWatch.Application/DTOs/TrackedProduct/UpdateProductRequest.cs) — `record(TargetPrice, IsActive)`
 - [TrackedProductResponse.cs](../src/PriceWatch.Application/DTOs/TrackedProduct/TrackedProductResponse.cs) — `record(Id, ListId, Name, Url, Source, TargetPrice, CurrentPrice, LowestPrice, IsActive, NextCheckAt)`
 - [PriceSnapshotResponse.cs](../src/PriceWatch.Application/DTOs/TrackedProduct/PriceSnapshotResponse.cs) — `record(Id, Price, CapturedAt)`
+
+</blockquote>
+</details>
+
+<details id="dir-application-dtos-notification">
+<summary><strong>DTOs/Notification/</strong></summary>
+<blockquote>
+
+- [NotificationResponse.cs](../src/PriceWatch.Application/DTOs/Notification/NotificationResponse.cs) — `record(Id, ProductId, ProductName, Type, Message, IsRead, CreatedAt)`
+- [AlertEvent.cs](../src/PriceWatch.Application/DTOs/Notification/AlertEvent.cs) — `record(ProductId, UserId, ProductName, Type, CurrentPrice, UserEmail)` — usado pelo Redis Streams
 
 </blockquote>
 </details>
@@ -383,6 +428,57 @@
 </blockquote>
 </details>
 
+<details id="dir-application-usecases-notification">
+<summary><strong>UseCases/Notification/</strong></summary>
+<blockquote>
+
+<details id="GetNotificationsUseCase">
+<summary><strong><a href="../src/PriceWatch.Application/UseCases/Notification/GetNotificationsUseCase.cs">GetNotificationsUseCase.cs</a> [class]</strong></summary>
+<blockquote>
+
+**dependências:** [INotificationRepository](#INotificationRepository)
+
+**métodos:** `ExecuteAsync(userId, isRead?) → IEnumerable<NotificationResponse>`
+
+</blockquote>
+</details>
+
+<details id="MarkAsReadUseCase">
+<summary><strong><a href="../src/PriceWatch.Application/UseCases/Notification/MarkAsReadUseCase.cs">MarkAsReadUseCase.cs</a> [class]</strong></summary>
+<blockquote>
+
+**dependências:** [INotificationRepository](#INotificationRepository)
+
+**métodos:** `ExecuteAsync(notificationId, userId)` — lança [NotificationNotFoundException](#NotificationNotFoundException) se não existe ou ownership inválida
+
+</blockquote>
+</details>
+
+<details id="MarkAllAsReadUseCase">
+<summary><strong><a href="../src/PriceWatch.Application/UseCases/Notification/MarkAllAsReadUseCase.cs">MarkAllAsReadUseCase.cs</a> [class]</strong></summary>
+<blockquote>
+
+**dependências:** [INotificationRepository](#INotificationRepository)
+
+**métodos:** `ExecuteAsync(userId)` — marca todas as notificações não lidas do user
+
+</blockquote>
+</details>
+
+<details id="ProcessAlertUseCase">
+<summary><strong><a href="../src/PriceWatch.Application/UseCases/Notification/ProcessAlertUseCase.cs">ProcessAlertUseCase.cs</a> [class]</strong></summary>
+<blockquote>
+
+**dependências:** [INotificationRepository](#INotificationRepository), [IEmailSender](#IEmailSender)
+
+**métodos:** `ExecuteAsync(userId, productId, productName, type, currentPrice, userEmail)` — cria Notification, salva, envia email
+
+</blockquote>
+</details>
+
+</blockquote>
+</details>
+
 </blockquote>
 </details>
 
@@ -417,6 +513,7 @@
 - [ProductListDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/ProductListDocument.cs) — documento MongoDB para [ProductList](#ProductList)
 - [TrackedProductDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/TrackedProductDocument.cs) — documento MongoDB para [TrackedProduct](#TrackedProduct)
 - [PriceSnapshotDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/PriceSnapshotDocument.cs) — documento MongoDB para [PriceSnapshot](#PriceSnapshot)
+- [NotificationDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/NotificationDocument.cs) — documento MongoDB para [Notification](#Notification)
 
 </blockquote>
 </details>
@@ -429,6 +526,7 @@
 - [ProductListMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/ProductListMappings.cs) — `ToDocument(ProductList)`, `ToDomain(ProductListDocument)`
 - [TrackedProductMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/TrackedProductMappings.cs) — `ToDocument(TrackedProduct)`, `ToDomain(TrackedProductDocument)`
 - [PriceSnapshotMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/PriceSnapshotMappings.cs) — `ToDocument(PriceSnapshot)`, `ToDomain(PriceSnapshotDocument)`
+- [NotificationMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/NotificationMappings.cs) — `ToDocument(Notification)`, `ToDomain(NotificationDocument)`
 
 </blockquote>
 </details>
@@ -477,6 +575,53 @@
 **implements:** [IPriceSnapshotRepository](#IPriceSnapshotRepository)
 
 **dependências:** `IMongoDatabase` — collection `price_snapshots`
+
+</blockquote>
+</details>
+
+</blockquote>
+</details>
+
+<details id="NotificationRepository">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Persistence/MongoDB/Repositories/NotificationRepository.cs">NotificationRepository.cs</a> [class]</strong></summary>
+<blockquote>
+
+**implements:** [INotificationRepository](#INotificationRepository)
+
+**dependências:** `IMongoDatabase` — collection `notifications`; suporta filtro por `isRead?`
+
+</blockquote>
+</details>
+
+</blockquote>
+</details>
+
+<details id="dir-infra-messaging">
+<summary><strong>Messaging/</strong></summary>
+<blockquote>
+
+<details id="RedisStreamPublisher">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Messaging/RedisStreamPublisher.cs">RedisStreamPublisher.cs</a> [class]</strong></summary>
+<blockquote>
+
+**implements:** [IAlertPublisher](#IAlertPublisher)
+
+**dependências:** `IConnectionMultiplexer` (StackExchange.Redis)
+
+**comportamento:** publica `AlertEvent` serializado como JSON no stream `"price-alerts"`
+
+</blockquote>
+</details>
+
+<details id="RedisStreamConsumer">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Messaging/RedisStreamConsumer.cs">RedisStreamConsumer.cs</a> [class]</strong></summary>
+<blockquote>
+
+**extends:** `BackgroundService`
+
+**dependências:** `IConnectionMultiplexer`, `IServiceScopeFactory`, `ILogger<RedisStreamConsumer>`
+
+**comportamento:** loop a cada 5s — consumer group `notification-group`; desserializa `AlertEvent`, chama [ProcessAlertUseCase](#ProcessAlertUseCase), faz `StreamAcknowledge`
 
 </blockquote>
 </details>
@@ -544,6 +689,7 @@
 - [MongoDbSettings.cs](../src/PriceWatch.Infrastructure/Settings/MongoDbSettings.cs) — `ConnectionString`, `DatabaseName`
 - [JwtSettings.cs](../src/PriceWatch.Infrastructure/Settings/JwtSettings.cs) — `Secret`, `Issuer`, `Audience`, `ExpiresInHours`
 - [SmtpSettings.cs](../src/PriceWatch.Infrastructure/Settings/SmtpSettings.cs) — `Host`, `Port`, `Username`, `Password`, `FromEmail`, `FromName`
+- [RedisSettings.cs](../src/PriceWatch.Infrastructure/Settings/RedisSettings.cs) — `ConnectionString`
 
 </blockquote>
 </details>
@@ -704,6 +850,26 @@
 - [AddProductUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/TrackedProduct/AddProductUseCaseTests.cs) — 2 testes: fetch inicial e RecordPrice
 - [GetProductsByListUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/TrackedProduct/GetProductsByListUseCaseTests.cs) — 1 teste
 - [GetListAnalysisUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/TrackedProduct/GetListAnalysisUseCaseTests.cs) — 1 teste: ordenação por DistancePercent
+
+</blockquote>
+</details>
+
+<details id="dir-unit-usecases-notification">
+<summary><strong>Application/UseCases/Notification/</strong></summary>
+<blockquote>
+
+- [GetNotificationsUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/Notification/GetNotificationsUseCaseTests.cs) — 2 testes: retorno e filtro por isRead
+- [MarkAsReadUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/Notification/MarkAsReadUseCaseTests.cs) — 3 testes: mark, not-found, ownership
+- [ProcessAlertUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/Notification/ProcessAlertUseCaseTests.cs) — 2 testes: create notification e send email
+
+</blockquote>
+</details>
+
+<details id="dir-unit-notification-domain">
+<summary><strong>Domain/Entities/ (Notification)</strong></summary>
+<blockquote>
+
+- [NotificationTests.cs](../tests/PriceWatch.UnitTests/Domain/Entities/NotificationTests.cs) — 4 testes: `IsRead=false`, message format TargetPrice, message format NewLowest, `MarkAsRead`
 
 </blockquote>
 </details>
