@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
 using PriceWatch.Application.UseCases.Auth;
+using PriceWatch.Application.UseCases.ProductList;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
 using PriceWatch.Infrastructure.Email;
@@ -90,6 +91,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
 
+        // ProductList
+        services.AddScoped<IProductListRepository, ProductListRepository>();
+
         return services;
     }
 
@@ -99,6 +103,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<LoginUseCase>();
         services.AddScoped<VerifyEmailUseCase>();
         services.AddScoped<ResendVerificationUseCase>();
+
+        // ProductList
+        services.AddScoped<CreateListUseCase>();
+        services.AddScoped<GetUserListsUseCase>();
+        services.AddScoped<UpdateListUseCase>();
+        services.AddScoped<DeleteListUseCase>();
+        services.AddScoped<GetListAnalysisUseCase>();
 
         return services;
     }
