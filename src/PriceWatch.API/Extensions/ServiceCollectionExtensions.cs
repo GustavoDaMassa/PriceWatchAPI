@@ -3,14 +3,18 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
+using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
 using PriceWatch.Application.UseCases.ProductList;
+using PriceWatch.Application.UseCases.TrackedProduct;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
 using PriceWatch.Infrastructure.Email;
+using PriceWatch.Infrastructure.Fetchers;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Repositories;
 using PriceWatch.Infrastructure.Security;
 using PriceWatch.Infrastructure.Settings;
+using PriceWatch.Infrastructure.Workers;
 
 namespace PriceWatch.API.Extensions;
 
@@ -94,6 +98,14 @@ public static class ServiceCollectionExtensions
         // ProductList
         services.AddScoped<IProductListRepository, ProductListRepository>();
 
+        // TrackedProduct
+        services.AddScoped<ITrackedProductRepository, TrackedProductRepository>();
+        services.AddScoped<IPriceSnapshotRepository, PriceSnapshotRepository>();
+        services.AddScoped<IPriceFetcher, MercadoLivreFetcher>();
+        services.AddScoped<IPriceFetcherResolver, PriceFetcherResolver>();
+        services.AddHttpClient<MercadoLivreFetcher>();
+        services.AddHostedService<PriceCheckWorker>();
+
         return services;
     }
 
@@ -110,6 +122,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<UpdateListUseCase>();
         services.AddScoped<DeleteListUseCase>();
         services.AddScoped<GetListAnalysisUseCase>();
+
+        // TrackedProduct
+        services.AddScoped<AddProductUseCase>();
+        services.AddScoped<GetProductsByListUseCase>();
+        services.AddScoped<UpdateProductUseCase>();
+        services.AddScoped<RemoveProductUseCase>();
+        services.AddScoped<GetPriceHistoryUseCase>();
 
         return services;
     }
