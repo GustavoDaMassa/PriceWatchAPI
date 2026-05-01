@@ -7,6 +7,7 @@
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)\integration.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +15,8 @@
     <PackageReference Include="FluentAssertions" Version="8.9.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="Testcontainers.MongoDB" Version="4.11.0" />
+    <PackageReference Include="Testcontainers.Redis" Version="4.11.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
   </ItemGroup>

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "PriceWatch.IntegrationTests": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "TESTCONTAINERS_RYUK_DISABLED": "true"
+      }
+    }
+  }
+}
