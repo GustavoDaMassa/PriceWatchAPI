@@ -6,4 +6,5 @@ public interface IPriceSnapshotRepository
 {
     Task CreateAsync(PriceSnapshot snapshot);
     Task<IEnumerable<PriceSnapshot>> GetByProductIdAsync(string productId, int limit = 100);
+    Task DeleteByProductIdAsync(string productId);
 }

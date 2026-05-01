@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 230" width="320" height="230">
+  <defs>
+    <clipPath id="ovalClip">
+      <ellipse cx="160" cy="115" rx="142" ry="100"/>
+    </clipPath>
+  </defs>
+
+  <!-- Fundo amarelo -->
+  <ellipse cx="160" cy="115" rx="142" ry="100" fill="#F5C800"/>
+
+  <!-- Faixa branca horizontal, recortada no oval -->
+  <rect x="18" y="78" width="284" height="74" fill="white" clip-path="url(#ovalClip)"/>
+
+  <!-- Esclera (amêndoa branca do olho) -->
+  <path d="M60,115 Q160,55 260,115 Q160,175 60,115 Z" fill="white"/>
+
+  <!-- Íris -->
+  <circle cx="160" cy="115" r="28" fill="#2B3090"/>
+
+  <!-- Pupila -->
+  <circle cx="160" cy="115" r="14" fill="#111111"/>
+
+  <!-- Reflexo principal -->
+  <circle cx="169" cy="106" r="7" fill="white" opacity="0.9"/>
+
+  <!-- Reflexo secundário -->
+  <circle cx="153" cy="123" r="3.5" fill="white" opacity="0.45"/>
+
+  <!-- Contorno do olho -->
+  <path d="M60,115 Q160,55 260,115 Q160,175 60,115 Z"
+        fill="none" stroke="#2B3090" stroke-width="4" stroke-linejoin="round"/>
+
+  <!--
+    Cílios superiores (sem sobrancelha).
+    Origens calculadas exatamente sobre a curva Q160,55 (pontos da bézier quadrática).
+    Direções: normal exterior à curva em cada ponto.
+    t=0.20 → (100, 96) → normal (-0.34, -0.94) → tip (93, 77)
+    t=0.35 → (130, 88) → normal (-0.18, -0.98) → tip (127, 68)
+    t=0.50 → (160, 85) → normal (0.00, -1.00) → tip (160, 65)
+    t=0.65 → (190, 88) → normal (+0.18, -0.98) → tip (193, 68)
+    t=0.80 → (220, 96) → normal (+0.34, -0.94) → tip (227, 77)
+  -->
+  <line x1="100" y1="96"  x2="93"  y2="77"  stroke="#2B3090" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="130" y1="88"  x2="127" y2="68"  stroke="#2B3090" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="160" y1="85"  x2="160" y2="65"  stroke="#2B3090" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="190" y1="88"  x2="193" y2="68"  stroke="#2B3090" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="220" y1="96"  x2="227" y2="77"  stroke="#2B3090" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Borda do oval por cima de tudo -->
+  <ellipse cx="160" cy="115" rx="142" ry="100" fill="none" stroke="#2B3090" stroke-width="10"/>
+
+</svg>

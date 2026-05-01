@@ -10,4 +10,5 @@ public interface ITrackedProductRepository
     Task CreateAsync(TrackedProduct product);
     Task UpdateAsync(TrackedProduct product);
     Task DeleteAsync(string id);
+    Task DeleteByListIdAsync(string listId);
 }

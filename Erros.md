@@ -41,6 +41,11 @@
 - Causa: credenciais inválidas armazenadas em `~/.docker/config.json`; Testcontainers tenta autenticar no Docker Hub para puxar `testcontainers/ryuk`
 - Correção: `TESTCONTAINERS_RYUK_DISABLED=true` definido em `launchSettings.json`; imagens puxadas manualmente com `docker pull` antes dos testes
 
+**2026-05-01 · feat/user-management · FormatException ao lançar UserNotFoundException com ID inválido**
+- Erro: `System.FormatException: Unrecognized Guid format` em testes que passam string `"unknown"` como userId
+- Causa: use cases usavam `new UserNotFoundException(Guid.Parse(userId))` — `Guid.Parse` lança quando o valor não é um GUID válido (ex: string de teste)
+- Correção: substituído por `new UserNotFoundException(userId)` usando o construtor de string em todos os use cases de usuário
+
 **2026-05-01 · Fase 7 · JWT inválido — 401 em todos os endpoints autenticados nos testes**
 - Erro: testes com JWT retornavam 401 — `AddJwtAuth` capturava o signing key no momento do registro de serviços, antes de `ConfigureAppConfiguration` aplicar o override do factory
 - Causa: em .NET 8 `WebApplicationFactory`, `ConfigureAppConfiguration` não garante que os valores sobrepostos estejam disponíveis quando `AddApplicationServices` é executado; o key de validação JWT usava o valor de `appsettings.json` (vazio → fallback), enquanto `JwtTokenService` usava `IOptions<JwtSettings>` com o valor correto do override

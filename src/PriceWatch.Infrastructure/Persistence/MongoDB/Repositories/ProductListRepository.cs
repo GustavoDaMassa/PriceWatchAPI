@@ -41,4 +41,9 @@ public class ProductListRepository : IProductListRepository
     {
         await _collection.DeleteOneAsync(d => d.Id == id);
     }
+
+    public async Task DeleteByUserIdAsync(string userId)
+    {
+        await _collection.DeleteManyAsync(d => d.UserId == userId);
+    }
 }

@@ -78,4 +78,17 @@ public class User
         EmailVerificationToken = newToken;
         TokenExpiresAt = expiresAt ?? DateTime.UtcNow.AddHours(24);
     }
+
+    public void UpdatePasswordHash(string newPasswordHash)
+    {
+        PasswordHash = newPasswordHash;
+    }
+
+    public void ChangeEmail(string newEmail, string verificationToken)
+    {
+        Email = newEmail;
+        IsEmailVerified = false;
+        EmailVerificationToken = verificationToken;
+        TokenExpiresAt = DateTime.UtcNow.AddHours(24);
+    }
 }

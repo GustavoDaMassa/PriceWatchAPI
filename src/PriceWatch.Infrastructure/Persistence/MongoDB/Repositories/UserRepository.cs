@@ -42,4 +42,9 @@ public class UserRepository : IUserRepository
             u => u.Id == user.Id,
             UserMappings.ToDocument(user));
     }
+
+    public async Task DeleteAsync(string id)
+    {
+        await _collection.DeleteOneAsync(u => u.Id == id);
+    }
 }

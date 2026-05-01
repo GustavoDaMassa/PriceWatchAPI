@@ -40,4 +40,9 @@ public class NotificationRepository : INotificationRepository
     {
         await _collection.ReplaceOneAsync(d => d.Id == notification.Id, NotificationMappings.ToDocument(notification));
     }
+
+    public async Task DeleteByUserIdAsync(string userId)
+    {
+        await _collection.DeleteManyAsync(d => d.UserId == userId);
+    }
 }
