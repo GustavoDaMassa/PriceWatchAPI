@@ -12,6 +12,7 @@
 - [.editorconfig](../.editorconfig) — estilo de código C#
 - [.gitignore](../.gitignore)
 - [Erros.md](../Erros.md) — bugs corrigidos
+- [docs/schema.md](schema.md) — schema MongoDB, índices e regras de integridade
 
 </blockquote>
 </details>
@@ -509,6 +510,7 @@
 <summary><strong>Persistence/MongoDB/Documents/</strong></summary>
 <blockquote>
 
+- [MongoDbIndexInitializer.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/MongoDbIndexInitializer.cs) — cria todos os índices das 5 collections no startup; idempotente
 - [UserDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/UserDocument.cs) — documento MongoDB para [User](#User)
 - [ProductListDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/ProductListDocument.cs) — documento MongoDB para [ProductList](#ProductList)
 - [TrackedProductDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/TrackedProductDocument.cs) — documento MongoDB para [TrackedProduct](#TrackedProduct)

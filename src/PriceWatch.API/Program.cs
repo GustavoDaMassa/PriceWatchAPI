@@ -1,5 +1,6 @@
 using PriceWatch.API.Extensions;
 using PriceWatch.API.Middleware;
+using PriceWatch.Infrastructure.Persistence.MongoDB;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +43,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// initialize MongoDB indexes before accepting requests
+using (var scope = app.Services.CreateScope())
+{
+    var indexInitializer = scope.ServiceProvider.GetRequiredService<MongoDbIndexInitializer>();
+    await indexInitializer.InitializeAsync();
+}
 
 app.Run();
 
