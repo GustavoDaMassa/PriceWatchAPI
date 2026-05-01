@@ -8,15 +8,23 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() { Title = "PriceWatch API", Version = "v1" });
+    c.SwaggerDoc("v1", new()
+    {
+        Title = "PriceWatch API",
+        Version = "v1",
+        Description = "API para monitoramento de preços de produtos. Monitora automaticamente URLs do Mercado Livre e dispara alertas quando o preço-alvo é atingido."
+    });
+
     c.AddSecurityDefinition("Bearer", new()
     {
         Name = "Authorization",
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Insira o token JWT obtido em POST /api/auth/login. Exemplo: Bearer eyJhbGci..."
     });
+
     c.AddSecurityRequirement(new()
     {
         {
@@ -24,6 +32,10 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
+
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
 });
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

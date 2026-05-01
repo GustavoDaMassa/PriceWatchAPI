@@ -7,9 +7,11 @@ using PriceWatch.Domain.Exceptions;
 
 namespace PriceWatch.API.Controllers;
 
+/// <summary>Gerenciamento de produtos monitorados dentro de uma lista.</summary>
 [ApiController]
 [Route("api/lists/{listId}/products")]
 [Authorize]
+[Produces("application/json")]
 public class TrackedProductsController : ControllerBase
 {
     private readonly GetProductsByListUseCase _getProducts;
@@ -32,35 +34,73 @@ public class TrackedProductsController : ControllerBase
         _getPriceHistory = getPriceHistory;
     }
 
+    /// <summary>Retorna todos os produtos monitorados em uma lista.</summary>
+    /// <param name="listId">ID da lista.</param>
+    /// <response code="200">Lista de produtos com preço atual, menor preço e próxima verificação.</response>
     [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<TrackedProductResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProducts(string listId)
     {
         var result = await _getProducts.ExecuteAsync(listId);
         return Ok(result);
     }
 
+    /// <summary>Adiciona um produto para monitoramento.</summary>
+    /// <remarks>
+    /// O sistema busca o preço inicial automaticamente.
+    /// O campo <c>source</c> indica a origem: <c>0</c> = MercadoLivre, <c>1</c> = Kabum, <c>2</c> = Manual.
+    /// O preço é verificado automaticamente a cada 1 hora.
+    /// </remarks>
+    /// <param name="listId">ID da lista onde o produto será adicionado.</param>
+    /// <response code="201">Produto adicionado e monitoramento iniciado.</response>
+    /// <response code="400">Source inválido ou URL não suportada.</response>
     [HttpPost]
+    [ProducesResponseType(typeof(TrackedProductResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> AddProduct(string listId, [FromBody] AddProductRequest request)
     {
         var result = await _addProduct.ExecuteAsync(GetUserId(), request);
         return StatusCode(201, result);
     }
 
+    /// <summary>Atualiza o preço-alvo ou ativa/desativa o monitoramento de um produto.</summary>
+    /// <param name="listId">ID da lista.</param>
+    /// <param name="id">ID do produto.</param>
+    /// <param name="request">Novos valores de targetPrice e isActive.</param>
+    /// <response code="204">Atualizado com sucesso.</response>
+    /// <response code="404">Produto não encontrado ou não pertence ao usuário.</response>
     [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateProduct(string listId, string id, [FromBody] UpdateProductRequest request)
     {
         await _updateProduct.ExecuteAsync(id, GetUserId(), request);
         return NoContent();
     }
 
+    /// <summary>Remove um produto do monitoramento.</summary>
+    /// <param name="listId">ID da lista.</param>
+    /// <param name="id">ID do produto a remover.</param>
+    /// <response code="204">Removido com sucesso.</response>
+    /// <response code="404">Produto não encontrado ou não pertence ao usuário.</response>
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveProduct(string listId, string id)
     {
         await _removeProduct.ExecuteAsync(id, GetUserId());
         return NoContent();
     }
 
+    /// <summary>Retorna o histórico de preços de um produto.</summary>
+    /// <remarks>Cada entrada representa uma verificação de preço. Ordenado do mais recente para o mais antigo.</remarks>
+    /// <param name="listId">ID da lista.</param>
+    /// <param name="id">ID do produto.</param>
+    /// <response code="200">Histórico de snapshots de preço.</response>
+    /// <response code="404">Produto não encontrado.</response>
     [HttpGet("{id}/history")]
+    [ProducesResponseType(typeof(IEnumerable<PriceSnapshotResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPriceHistory(string listId, string id)
     {
         var result = await _getPriceHistory.ExecuteAsync(id, GetUserId());
