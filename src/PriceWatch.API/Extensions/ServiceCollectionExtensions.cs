@@ -9,6 +9,7 @@ using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
 using PriceWatch.Application.UseCases.ProductList;
 using PriceWatch.Application.UseCases.TrackedProduct;
+using PriceWatch.Application.UseCases.Users;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
 using PriceWatch.Infrastructure.Email;
@@ -151,6 +152,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<MarkAsReadUseCase>();
         services.AddScoped<MarkAllAsReadUseCase>();
         services.AddScoped<ProcessAlertUseCase>();
+
+        // Users
+        services.AddScoped<GetProfileUseCase>();
+        services.AddScoped<ChangePasswordUseCase>();
+        services.AddScoped<ChangeEmailUseCase>();
+        services.AddScoped<DeleteAccountUseCase>();
 
         return services;
     }

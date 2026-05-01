@@ -29,4 +29,9 @@ public class PriceSnapshotRepository : IPriceSnapshotRepository
             .ToListAsync();
         return docs.Select(PriceSnapshotMappings.ToDomain);
     }
+
+    public async Task DeleteByProductIdAsync(string productId)
+    {
+        await _collection.DeleteManyAsync(d => d.ProductId == productId);
+    }
 }

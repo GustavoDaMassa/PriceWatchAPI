@@ -9,4 +9,5 @@ public interface IProductListRepository
     Task CreateAsync(ProductList list);
     Task UpdateAsync(ProductList list);
     Task DeleteAsync(string id);
+    Task DeleteByUserIdAsync(string userId);
 }

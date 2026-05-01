@@ -8,4 +8,5 @@ public interface INotificationRepository
     Task<Notification?> GetByIdAsync(string id);
     Task CreateAsync(Notification notification);
     Task UpdateAsync(Notification notification);
+    Task DeleteByUserIdAsync(string userId);
 }

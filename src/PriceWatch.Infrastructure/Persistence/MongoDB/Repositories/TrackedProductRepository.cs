@@ -50,4 +50,9 @@ public class TrackedProductRepository : ITrackedProductRepository
     {
         await _collection.DeleteOneAsync(d => d.Id == id);
     }
+
+    public async Task DeleteByListIdAsync(string listId)
+    {
+        await _collection.DeleteManyAsync(d => d.ListId == listId);
+    }
 }
