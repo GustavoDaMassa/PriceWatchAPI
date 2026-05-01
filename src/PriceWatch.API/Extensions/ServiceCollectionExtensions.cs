@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
 using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
+using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
 using PriceWatch.Application.UseCases.ProductList;
 using PriceWatch.Application.UseCases.TrackedProduct;
@@ -54,6 +55,8 @@ public static class ServiceCollectionExtensions
             var client = sp.GetRequiredService<IMongoClient>();
             return client.GetDatabase(settings.DatabaseName);
         });
+
+        services.AddScoped<MongoDbIndexInitializer>();
 
         return services;
     }
