@@ -28,3 +28,20 @@
 - Erro: `CS0118 - "ProductList" é um namespace, mas é usado como um tipo` em múltiplos arquivos de teste
 - Causa: o namespace dos testes `PriceWatch.UnitTests.Application.UseCases.ProductList` contém `ProductList` como parte do caminho, fazendo o compilador resolver `ProductList` como namespace em vez do tipo `PriceWatch.Domain.Entities.ProductList`
 - Correção: adicionado alias `using DomainProductList = PriceWatch.Domain.Entities.ProductList` nos quatro arquivos de teste dentro desse namespace
+
+---
+
+**2026-05-01 · Fase 7 · using `Testcontainers.MongoDB` inexistente**
+- Erro: `CS0234 - O nome de tipo ou namespace "MongoDB" não existe no namespace "Testcontainers"`
+- Causa: o assembly do pacote chama-se `Testcontainers.MongoDb.dll` — namespace é `Testcontainers.MongoDb` (camelCase), não `Testcontainers.MongoDB`
+- Correção: using corrigido para `using Testcontainers.MongoDb;`
+
+**2026-05-01 · Fase 7 · Testcontainers/ryuk falha ao subir (Docker Hub 401)**
+- Erro: `Docker API responded with status code=Unauthorized` ao iniciar ResourceReaper
+- Causa: credenciais inválidas armazenadas em `~/.docker/config.json`; Testcontainers tenta autenticar no Docker Hub para puxar `testcontainers/ryuk`
+- Correção: `TESTCONTAINERS_RYUK_DISABLED=true` definido em `launchSettings.json`; imagens puxadas manualmente com `docker pull` antes dos testes
+
+**2026-05-01 · Fase 7 · JWT inválido — 401 em todos os endpoints autenticados nos testes**
+- Erro: testes com JWT retornavam 401 — `AddJwtAuth` capturava o signing key no momento do registro de serviços, antes de `ConfigureAppConfiguration` aplicar o override do factory
+- Causa: em .NET 8 `WebApplicationFactory`, `ConfigureAppConfiguration` não garante que os valores sobrepostos estejam disponíveis quando `AddApplicationServices` é executado; o key de validação JWT usava o valor de `appsettings.json` (vazio → fallback), enquanto `JwtTokenService` usava `IOptions<JwtSettings>` com o valor correto do override
+- Correção: substituído `ConfigureAppConfiguration` para JWT por `PostConfigure<JwtBearerOptions>` + `services.Configure<JwtSettings>` dentro de `ConfigureTestServices`, que roda DEPOIS de todo o registro de serviços
