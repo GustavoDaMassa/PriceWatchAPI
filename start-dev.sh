@@ -19,5 +19,8 @@ echo ""
 echo "Swagger:  http://localhost:5283/swagger"
 echo "MailHog:  http://localhost:8025"
 echo ""
+echo "Compilando..."
+dotnet build src/PriceWatch.API --no-restore -q
+
 echo "Iniciando API..."
-dotnet run --project src/PriceWatch.API
+dotnet run --project src/PriceWatch.API --no-build
