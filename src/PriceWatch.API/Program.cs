@@ -38,6 +38,20 @@ builder.Services.AddSwaggerGen(c =>
     c.IncludeXmlComments(xmlPath);
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+        else
+            policy
+                .WithOrigins(builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? [])
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+    });
+});
+
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddApplicationServices(builder.Configuration);
@@ -51,6 +65,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
