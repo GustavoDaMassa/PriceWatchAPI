@@ -79,8 +79,7 @@ public class RedisStreamConsumer : BackgroundService
                 alertEvent.ProductId,
                 alertEvent.ProductName,
                 alertEvent.Type,
-                alertEvent.CurrentPrice,
-                alertEvent.UserEmail);
+                alertEvent.CurrentPrice);
 
             await db.StreamAcknowledgeAsync(StreamKey, GroupName, entry.Id);
         }

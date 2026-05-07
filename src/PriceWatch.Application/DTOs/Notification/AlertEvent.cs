@@ -7,5 +7,4 @@ public record AlertEvent(
     string UserId,
     string ProductName,
     NotificationType Type,
-    decimal CurrentPrice,
-    string UserEmail);
+    decimal CurrentPrice);

@@ -26,9 +26,6 @@ public class LoginUseCase
         var user = await _userRepository.GetByEmailAsync(request.Email)
             ?? throw new UserNotFoundException(request.Email);
 
-        if (!user.IsEmailVerified)
-            throw new BusinessException("Email not verified. Please verify your email before logging in.");
-
         if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
             throw new BusinessException("Invalid credentials.");
 

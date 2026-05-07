@@ -24,7 +24,7 @@ public class RedisStreamPublisher : IAlertPublisher
     {
         var db = _redis.GetDatabase();
 
-        var alertEvent = new AlertEvent(productId, userId, productName, type, currentPrice, string.Empty);
+        var alertEvent = new AlertEvent(productId, userId, productName, type, currentPrice);
         var payload = JsonSerializer.Serialize(alertEvent);
 
         await db.StreamAddAsync("price-alerts", new NameValueEntry[]
