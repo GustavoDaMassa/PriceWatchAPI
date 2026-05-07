@@ -55,3 +55,13 @@
 - Erro: Swagger UI retorna "Failed to fetch" ao executar qualquer requisição; mensagem lista CORS, Network Failure ou URL scheme inválido como possíveis causas
 - Causa: `Program.cs` não continha `AddCors()` nem `UseCors()` — CORS nunca foi adicionado ao projeto
 - Correção: adicionado `AddCors()` com política permissiva em desenvolvimento (`AllowAnyOrigin/Method/Header`) e baseada em `AllowedOrigins` (config) em produção; `UseCors()` inserido no pipeline antes de `UseAuthentication` — commit `6c3ec97`
+
+**2026-05-07 · Testes manuais · MercadoLivreFetcher retorna 403 ao buscar preço**
+- Erro: endpoint de adicionar produto retorna BusinessException com "Mercado Livre API returned 403 for item 'MLBxxx'"
+- Causa: `MercadoLivreFetcher` chamava `GET /items/{id}` sem header `Authorization` — a API do Mercado Livre exige OAuth client credentials mesmo para leitura de itens públicos via chamadas server-side
+- Correção: implementado `MercadoLivreTokenService` (singleton com cache + renovação automática) que obtém access token via `POST /oauth/token` com `grant_type=client_credentials`; fetcher injeta o token em cada requisição — commit `de40ef2`
+
+**2026-05-07 · Testes manuais · Swagger exibe rotas antigas após alteração de endpoints**
+- Erro: Swagger UI continua exibindo rotas antigas após atualizar os controllers e reiniciar a API via `start-dev.sh`
+- Causa: `start-dev.sh` usava `dotnet run` com build incremental, que reutilizava artefatos em cache e não regenerava o XML de documentação do Swagger
+- Correção: separado em `dotnet build --no-restore -q` seguido de `dotnet run --no-build`, garantindo rebuild explícito antes de subir — commit `4f93e66`
