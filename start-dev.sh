@@ -20,6 +20,7 @@ echo "Swagger:  http://localhost:5283/swagger"
 echo "MailHog:  http://localhost:8025"
 echo ""
 echo "Compilando..."
+find src -path "*/obj/*.cache" -delete 2>/dev/null || true
 dotnet build src/PriceWatch.API --no-restore -q
 
 echo "Iniciando API..."
