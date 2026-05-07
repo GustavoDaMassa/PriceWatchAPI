@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+if [ -f local.env ]; then
+  set -a
+  source local.env
+  set +a
+fi
+
 echo "Subindo infraestrutura..."
 docker compose up -d
 
