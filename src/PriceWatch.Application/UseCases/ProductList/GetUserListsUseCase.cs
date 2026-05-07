@@ -15,6 +15,6 @@ public class GetUserListsUseCase
     public async Task<IEnumerable<ProductListResponse>> ExecuteAsync(string userId)
     {
         var lists = await _repository.GetByUserIdAsync(userId);
-        return lists.Select(l => new ProductListResponse(l.Id, l.Name, l.Description, l.CreatedAt));
+        return lists.Select(l => new ProductListResponse(l.Id, l.Name, l.Description));
     }
 }

@@ -17,6 +17,6 @@ public class CreateListUseCase
     {
         var list = Domain.Entities.ProductList.Create(userId, request.Name, request.Description);
         await _repository.CreateAsync(list);
-        return new ProductListResponse(list.Id, list.Name, list.Description, list.CreatedAt);
+        return new ProductListResponse(list.Id, list.Name, list.Description);
     }
 }
