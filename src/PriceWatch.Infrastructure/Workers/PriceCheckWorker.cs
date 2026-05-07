@@ -49,7 +49,7 @@ public class PriceCheckWorker : BackgroundService
         {
             try
             {
-                var fetcher = fetchers.FirstOrDefault(f => f.Source == product.Source.ToString().ToLower());
+                var fetcher = fetchers.FirstOrDefault(f => f.ProductSource == product.Source);
                 if (fetcher is null)
                 {
                     _logger.LogWarning("No fetcher for source {Source}, skipping product {Id}.", product.Source, product.Id);
@@ -57,16 +57,16 @@ public class PriceCheckWorker : BackgroundService
                 }
 
                 var previousLowest = product.LowestPrice;
-                var price = await fetcher.FetchAsync(product.Url);
-                var snapshot = product.RecordPrice(price);
+                var fetchResult = await fetcher.FetchAsync(product.Url);
+                var snapshot = product.RecordPrice(fetchResult.Price);
 
                 await snapshotRepo.CreateAsync(snapshot);
                 await productRepo.UpdateAsync(product);
 
                 if (product.ShouldTriggerTargetAlert())
-                    await alertPublisher.PublishAsync(product.Id, product.UserId, product.Name, NotificationType.TargetPriceReached, price);
+                    await alertPublisher.PublishAsync(product.Id, product.UserId, product.Name, NotificationType.TargetPriceReached, fetchResult.Price);
                 else if (product.ShouldTriggerLowestAlert(previousLowest))
-                    await alertPublisher.PublishAsync(product.Id, product.UserId, product.Name, NotificationType.NewLowestPrice, price);
+                    await alertPublisher.PublishAsync(product.Id, product.UserId, product.Name, NotificationType.NewLowestPrice, fetchResult.Price);
             }
             catch (Exception ex)
             {

@@ -3,6 +3,7 @@ using System.Text;
 using FluentAssertions;
 using Moq;
 using Moq.Protected;
+using PriceWatch.Domain.Enums;
 using PriceWatch.Domain.Exceptions;
 using PriceWatch.Infrastructure.Fetchers;
 
@@ -29,13 +30,14 @@ public class MercadoLivreFetcherTests
     [InlineData("https://produto.mercadolivre.com.br/MLB-1234567890-titulo-_JM")]
     [InlineData("https://www.mercadolivre.com.br/titulo/p/MLB1234567890")]
     [InlineData("https://www.mercadolivre.com.br/MLB1234567890-titulo-_JM")]
-    public async Task FetchAsync_ValidUrl_ReturnsPrice(string url)
+    public async Task FetchAsync_ValidUrl_ReturnsPriceAndName(string url)
     {
-        var fetcher = BuildFetcher(HttpStatusCode.OK, """{"price": 1299.99}""");
+        var fetcher = BuildFetcher(HttpStatusCode.OK, """{"price": 1299.99, "title": "Produto Teste"}""");
 
         var result = await fetcher.FetchAsync(url);
 
-        result.Should().Be(1299.99m);
+        result.Price.Should().Be(1299.99m);
+        result.Name.Should().Be("Produto Teste");
     }
 
     [Theory]
@@ -44,7 +46,7 @@ public class MercadoLivreFetcherTests
     [InlineData("invalid-url")]
     public async Task FetchAsync_InvalidUrl_ThrowsBusinessException(string url)
     {
-        var fetcher = BuildFetcher(HttpStatusCode.OK, """{"price": 100}""");
+        var fetcher = BuildFetcher(HttpStatusCode.OK, """{"price": 100, "title": "X"}""");
 
         var act = () => fetcher.FetchAsync(url);
 
@@ -64,8 +66,8 @@ public class MercadoLivreFetcherTests
     }
 
     [Theory]
-    [InlineData("""{"price": 0}""")]
-    [InlineData("""{"price": null}""")]
+    [InlineData("""{"price": 0, "title": "X"}""")]
+    [InlineData("""{"price": null, "title": "X"}""")]
     [InlineData("{}")]
     public async Task FetchAsync_InvalidPrice_ThrowsBusinessException(string json)
     {
@@ -77,11 +79,24 @@ public class MercadoLivreFetcherTests
             .WithMessage("*valid price*");
     }
 
-    [Fact]
-    public void Source_ShouldBeMercadolivre()
+    [Theory]
+    [InlineData("https://produto.mercadolivre.com.br/MLB-123-titulo-_JM", true)]
+    [InlineData("https://www.mercadolivre.com.br/titulo/p/MLB123", true)]
+    [InlineData("https://www.mercadolibre.com/titulo/MLB123", true)]
+    [InlineData("https://www.amazon.com.br/produto/123", false)]
+    [InlineData("https://www.kabum.com.br/produto/123", false)]
+    public void CanHandle_ReturnsExpectedResult(string url, bool expected)
     {
         var fetcher = new MercadoLivreFetcher(new HttpClient());
 
-        fetcher.Source.Should().Be("mercadolivre");
+        fetcher.CanHandle(url).Should().Be(expected);
+    }
+
+    [Fact]
+    public void ProductSource_ShouldBeMercadoLivre()
+    {
+        var fetcher = new MercadoLivreFetcher(new HttpClient());
+
+        fetcher.ProductSource.Should().Be(ProductSource.MercadoLivre);
     }
 }

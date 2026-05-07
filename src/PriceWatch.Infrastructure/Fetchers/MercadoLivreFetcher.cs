@@ -1,8 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using PriceWatch.Domain.Enums;
 using PriceWatch.Domain.Exceptions;
 using PriceWatch.Domain.Interfaces.Services;
+using PriceWatch.Domain.ValueObjects;
 
 namespace PriceWatch.Infrastructure.Fetchers;
 
@@ -10,14 +12,18 @@ public partial class MercadoLivreFetcher : IPriceFetcher
 {
     private readonly HttpClient _httpClient;
 
-    public string Source => "mercadolivre";
+    public ProductSource ProductSource => ProductSource.MercadoLivre;
+
+    public bool CanHandle(string url) =>
+        url.Contains("mercadolivre.com.br", StringComparison.OrdinalIgnoreCase) ||
+        url.Contains("mercadolibre.com", StringComparison.OrdinalIgnoreCase);
 
     public MercadoLivreFetcher(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
-    public async Task<decimal> FetchAsync(string url)
+    public async Task<ProductFetchResult> FetchAsync(string url)
     {
         var match = ItemIdRegex().Match(url);
         if (!match.Success)
@@ -35,11 +41,13 @@ public partial class MercadoLivreFetcher : IPriceFetcher
         if (item is null || item.Price <= 0)
             throw new BusinessException($"Could not read a valid price for item '{itemId}'.");
 
-        return item.Price;
+        return new ProductFetchResult(item.Price, item.Title);
     }
 
     [GeneratedRegex(@"MLB-?(\d+)", RegexOptions.Compiled)]
     private static partial Regex ItemIdRegex();
 
-    private record MercadoLivreItem([property: JsonPropertyName("price")] decimal Price);
+    private record MercadoLivreItem(
+        [property: JsonPropertyName("price")] decimal Price,
+        [property: JsonPropertyName("title")] string Title);
 }

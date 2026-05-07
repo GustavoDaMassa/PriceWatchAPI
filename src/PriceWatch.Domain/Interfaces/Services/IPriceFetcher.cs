@@ -1,7 +1,11 @@
+using PriceWatch.Domain.Enums;
+using PriceWatch.Domain.ValueObjects;
+
 namespace PriceWatch.Domain.Interfaces.Services;
 
 public interface IPriceFetcher
 {
-    string Source { get; }
-    Task<decimal> FetchAsync(string url);
+    ProductSource ProductSource { get; }
+    bool CanHandle(string url);
+    Task<ProductFetchResult> FetchAsync(string url);
 }

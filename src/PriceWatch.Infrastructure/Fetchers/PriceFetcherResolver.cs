@@ -16,10 +16,17 @@ public class PriceFetcherResolver : IPriceFetcherResolver
 
     public IPriceFetcher Resolve(ProductSource source)
     {
-        var key = source.ToString().ToLower();
-        var fetcher = _fetchers.FirstOrDefault(f => f.Source == key);
+        var fetcher = _fetchers.FirstOrDefault(f => f.ProductSource == source);
         if (fetcher is null)
             throw new BusinessException($"No price fetcher registered for source '{source}'.");
+        return fetcher;
+    }
+
+    public IPriceFetcher Resolve(string url)
+    {
+        var fetcher = _fetchers.FirstOrDefault(f => f.CanHandle(url));
+        if (fetcher is null)
+            throw new BusinessException("No price fetcher found for the provided URL.");
         return fetcher;
     }
 }

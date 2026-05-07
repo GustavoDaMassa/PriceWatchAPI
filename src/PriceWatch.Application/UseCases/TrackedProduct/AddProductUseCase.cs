@@ -15,15 +15,15 @@ public class AddProductUseCase
         _resolver = resolver;
     }
 
-    public async Task<TrackedProductResponse> ExecuteAsync(string userId, AddProductRequest request)
+    public async Task<TrackedProductResponse> ExecuteAsync(string userId, string listId, AddProductRequest request)
     {
-        var fetcher = _resolver.Resolve(request.Source);
-        var fetchedPrice = await fetcher.FetchAsync(request.Url);
+        var fetcher = _resolver.Resolve(request.Url);
+        var fetchResult = await fetcher.FetchAsync(request.Url);
 
         var product = Domain.Entities.TrackedProduct.Create(
-            request.ListId, userId, request.Url, request.Source, request.Name, request.TargetPrice);
+            listId, userId, request.Url, fetcher.ProductSource, fetchResult.Name, request.TargetPrice);
 
-        product.RecordPrice(fetchedPrice);
+        product.RecordPrice(fetchResult.Price);
 
         await _repository.CreateAsync(product);
 

@@ -47,19 +47,18 @@ public class TrackedProductsController : ControllerBase
 
     /// <summary>Adiciona um produto para monitoramento.</summary>
     /// <remarks>
-    /// O sistema busca o preço inicial automaticamente.
-    /// O campo <c>source</c> indica a origem: <c>0</c> = MercadoLivre, <c>1</c> = Kabum, <c>2</c> = Manual.
+    /// O sistema detecta a origem automaticamente pela URL e busca o nome e preço inicial via API.
     /// O preço é verificado automaticamente a cada 1 hora.
     /// </remarks>
     /// <param name="listId">ID da lista onde o produto será adicionado.</param>
     /// <response code="201">Produto adicionado e monitoramento iniciado.</response>
-    /// <response code="400">Source inválido ou URL não suportada.</response>
+    /// <response code="400">URL não suportada ou produto não encontrado.</response>
     [HttpPost]
     [ProducesResponseType(typeof(TrackedProductResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> AddProduct(string listId, [FromBody] AddProductRequest request)
     {
-        var result = await _addProduct.ExecuteAsync(GetUserId(), request);
+        var result = await _addProduct.ExecuteAsync(GetUserId(), listId, request);
         return StatusCode(201, result);
     }
 
