@@ -107,6 +107,9 @@ public static class ServiceCollectionExtensions
         // TrackedProduct
         services.AddScoped<ITrackedProductRepository, TrackedProductRepository>();
         services.AddScoped<IPriceSnapshotRepository, PriceSnapshotRepository>();
+        services.Configure<MercadoLivreSettings>(configuration.GetSection("MercadoLivre"));
+        services.AddHttpClient<MercadoLivreTokenService>();
+        services.AddSingleton<MercadoLivreTokenService>();
         services.AddScoped<IPriceFetcher, MercadoLivreFetcher>();
         services.AddScoped<IPriceFetcherResolver, PriceFetcherResolver>();
         services.AddHttpClient<MercadoLivreFetcher>();

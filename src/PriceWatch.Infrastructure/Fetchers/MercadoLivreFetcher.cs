@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -11,6 +12,7 @@ namespace PriceWatch.Infrastructure.Fetchers;
 public partial class MercadoLivreFetcher : IPriceFetcher
 {
     private readonly HttpClient _httpClient;
+    private readonly MercadoLivreTokenService _tokenService;
 
     public ProductSource ProductSource => ProductSource.MercadoLivre;
 
@@ -18,9 +20,10 @@ public partial class MercadoLivreFetcher : IPriceFetcher
         url.Contains("mercadolivre.com.br", StringComparison.OrdinalIgnoreCase) ||
         url.Contains("mercadolibre.com", StringComparison.OrdinalIgnoreCase);
 
-    public MercadoLivreFetcher(HttpClient httpClient)
+    public MercadoLivreFetcher(HttpClient httpClient, MercadoLivreTokenService tokenService)
     {
         _httpClient = httpClient;
+        _tokenService = tokenService;
     }
 
     public async Task<ProductFetchResult> FetchAsync(string url)
@@ -30,8 +33,12 @@ public partial class MercadoLivreFetcher : IPriceFetcher
             throw new BusinessException("Invalid Mercado Livre URL: could not extract item ID.");
 
         var itemId = $"MLB{match.Groups[1].Value}";
+        var token = await _tokenService.GetTokenAsync();
 
-        var response = await _httpClient.GetAsync($"https://api.mercadolibre.com/items/{itemId}");
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.mercadolibre.com/items/{itemId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode)
             throw new BusinessException($"Mercado Livre API returned {(int)response.StatusCode} for item '{itemId}'.");
 

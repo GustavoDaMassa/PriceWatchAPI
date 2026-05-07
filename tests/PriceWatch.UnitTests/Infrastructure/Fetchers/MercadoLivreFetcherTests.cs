@@ -1,16 +1,38 @@
 using System.Net;
 using System.Text;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Moq.Protected;
 using PriceWatch.Domain.Enums;
 using PriceWatch.Domain.Exceptions;
 using PriceWatch.Infrastructure.Fetchers;
+using PriceWatch.Infrastructure.Settings;
 
 namespace PriceWatch.UnitTests.Infrastructure.Fetchers;
 
 public class MercadoLivreFetcherTests
 {
+    private static MercadoLivreTokenService BuildTokenService(string token = "test-token")
+    {
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content = new StringContent(
+                    $$"""{"access_token":"{{token}}","expires_in":21600}""",
+                    Encoding.UTF8, "application/json")
+            });
+
+        var settings = Options.Create(new MercadoLivreSettings { ClientId = "id", ClientSecret = "secret" });
+        return new MercadoLivreTokenService(new HttpClient(handler.Object), settings, NullLogger<MercadoLivreTokenService>.Instance);
+    }
+
     private static MercadoLivreFetcher BuildFetcher(HttpStatusCode status, string json)
     {
         var handler = new Mock<HttpMessageHandler>();
@@ -23,7 +45,7 @@ public class MercadoLivreFetcherTests
                 StatusCode = status,
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             });
-        return new MercadoLivreFetcher(new HttpClient(handler.Object));
+        return new MercadoLivreFetcher(new HttpClient(handler.Object), BuildTokenService());
     }
 
     [Theory]
@@ -87,7 +109,7 @@ public class MercadoLivreFetcherTests
     [InlineData("https://www.kabum.com.br/produto/123", false)]
     public void CanHandle_ReturnsExpectedResult(string url, bool expected)
     {
-        var fetcher = new MercadoLivreFetcher(new HttpClient());
+        var fetcher = new MercadoLivreFetcher(new HttpClient(), BuildTokenService());
 
         fetcher.CanHandle(url).Should().Be(expected);
     }
@@ -95,7 +117,7 @@ public class MercadoLivreFetcherTests
     [Fact]
     public void ProductSource_ShouldBeMercadoLivre()
     {
-        var fetcher = new MercadoLivreFetcher(new HttpClient());
+        var fetcher = new MercadoLivreFetcher(new HttpClient(), BuildTokenService());
 
         fetcher.ProductSource.Should().Be(ProductSource.MercadoLivre);
     }

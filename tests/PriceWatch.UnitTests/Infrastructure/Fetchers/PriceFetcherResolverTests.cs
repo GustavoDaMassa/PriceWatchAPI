@@ -11,7 +11,7 @@ public class PriceFetcherResolverTests
     [Fact]
     public void Resolve_BySource_WithMercadoLivreSource_ShouldReturnMercadoLivreFetcher()
     {
-        var fetchers = new[] { new MercadoLivreFetcher(null!) };
+        var fetchers = new[] { new MercadoLivreFetcher(null!, null!) };
         var resolver = new PriceFetcherResolver(fetchers);
 
         var result = resolver.Resolve(ProductSource.MercadoLivre);
@@ -32,7 +32,7 @@ public class PriceFetcherResolverTests
     [Fact]
     public void Resolve_ByUrl_WithMercadoLivreUrl_ShouldReturnMercadoLivreFetcher()
     {
-        var fetchers = new[] { new MercadoLivreFetcher(null!) };
+        var fetchers = new[] { new MercadoLivreFetcher(null!, null!) };
         var resolver = new PriceFetcherResolver(fetchers);
 
         var result = resolver.Resolve("https://produto.mercadolivre.com.br/MLB-123-titulo-_JM");
