@@ -27,14 +27,14 @@ public class GetListAnalysisUseCaseTests
         _listRepo.Setup(r => r.GetByIdAsync(list.Id)).ReturnsAsync(list);
 
         // Produto A: currentPrice=80, targetPrice=100 → distance = (80-100)/100*100 = -20%
-        var prodA = DomainTrackedProduct.Create(list.Id, "user-1", "http://a.com", ProductSource.Manual, "Prod A", 100m);
+        var prodA = DomainTrackedProduct.Create("user-1", "http://a.com", ProductSource.Manual, "Prod A", 100m, list.Id);
         prodA.RecordPrice(80m);
 
         // Produto B: currentPrice=150, targetPrice=100 → distance = (150-100)/100*100 = 50%
-        var prodB = DomainTrackedProduct.Create(list.Id, "user-1", "http://b.com", ProductSource.Manual, "Prod B", 100m);
+        var prodB = DomainTrackedProduct.Create("user-1", "http://b.com", ProductSource.Manual, "Prod B", 100m, list.Id);
         prodB.RecordPrice(150m);
 
-        _productRepo.Setup(r => r.GetByListIdAsync(list.Id)).ReturnsAsync(new[] { prodB, prodA });
+        _productRepo.Setup(r => r.GetByUserIdAsync("user-1", list.Id)).ReturnsAsync(new[] { prodB, prodA });
 
         var result = (await _useCase.ExecuteAsync(list.Id, "user-1")).ToList();
 

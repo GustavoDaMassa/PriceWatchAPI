@@ -15,9 +15,15 @@ public class TrackedProductRepository : ITrackedProductRepository
         _collection = database.GetCollection<TrackedProductDocument>("tracked_products");
     }
 
-    public async Task<IEnumerable<TrackedProduct>> GetByListIdAsync(string listId)
+    public async Task<IEnumerable<TrackedProduct>> GetByUserIdAsync(string userId, string? listId = null)
     {
-        var docs = await _collection.Find(d => d.ListId == listId).ToListAsync();
+        var filter = listId is not null
+            ? Builders<TrackedProductDocument>.Filter.And(
+                Builders<TrackedProductDocument>.Filter.Eq(d => d.UserId, userId),
+                Builders<TrackedProductDocument>.Filter.Eq(d => d.ListId, listId))
+            : Builders<TrackedProductDocument>.Filter.Eq(d => d.UserId, userId);
+
+        var docs = await _collection.Find(filter).ToListAsync();
         return docs.Select(TrackedProductMappings.ToDomain);
     }
 
@@ -51,8 +57,9 @@ public class TrackedProductRepository : ITrackedProductRepository
         await _collection.DeleteOneAsync(d => d.Id == id);
     }
 
-    public async Task DeleteByListIdAsync(string listId)
+    public async Task UnlinkByListIdAsync(string listId)
     {
-        await _collection.DeleteManyAsync(d => d.ListId == listId);
+        var update = Builders<TrackedProductDocument>.Update.Set(d => d.ListId, (string?)null);
+        await _collection.UpdateManyAsync(d => d.ListId == listId, update);
     }
 }

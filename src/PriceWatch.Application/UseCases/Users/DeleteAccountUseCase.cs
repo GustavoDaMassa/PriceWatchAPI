@@ -37,16 +37,14 @@ public class DeleteAccountUseCase
         if (!_passwordHasher.Verify(password, user.PasswordHash))
             throw new BusinessException("Current password is incorrect.");
 
-        // delete snapshots → products → lists → notifications → user
-        var lists = await _listRepository.GetByUserIdAsync(userId);
-        foreach (var list in lists)
-        {
-            var products = await _productRepository.GetByListIdAsync(list.Id);
-            foreach (var product in products)
-                await _snapshotRepository.DeleteByProductIdAsync(product.Id);
+        // delete snapshots and products for the user, then lists, notifications, user
+        var products = await _productRepository.GetByUserIdAsync(userId);
+        foreach (var product in products)
+            await _snapshotRepository.DeleteByProductIdAsync(product.Id);
 
-            await _productRepository.DeleteByListIdAsync(list.Id);
-        }
+        var productIds = products.Select(p => p.Id).ToList();
+        foreach (var id in productIds)
+            await _productRepository.DeleteAsync(id);
 
         await _listRepository.DeleteByUserIdAsync(userId);
         await _notificationRepository.DeleteByUserIdAsync(userId);

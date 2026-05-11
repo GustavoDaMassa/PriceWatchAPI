@@ -148,7 +148,7 @@ public static class ServiceCollectionExtensions
 
         // TrackedProduct
         services.AddScoped<AddProductUseCase>();
-        services.AddScoped<GetProductsByListUseCase>();
+        services.AddScoped<GetUserProductsUseCase>();
         services.AddScoped<UpdateProductUseCase>();
         services.AddScoped<RemoveProductUseCase>();
         services.AddScoped<GetPriceHistoryUseCase>();

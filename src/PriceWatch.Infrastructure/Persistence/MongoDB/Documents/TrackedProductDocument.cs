@@ -11,7 +11,7 @@ public class TrackedProductDocument
     public string Id { get; set; } = default!;
 
     [BsonElement("listId")]
-    public string ListId { get; set; } = default!;
+    public string? ListId { get; set; }
 
     [BsonElement("userId")]
     public string UserId { get; set; } = default!;

@@ -4,7 +4,7 @@ namespace PriceWatch.Application.DTOs.TrackedProduct;
 
 public record TrackedProductResponse(
     string Id,
-    string ListId,
+    string? ListId,
     string Name,
     string Url,
     string? ImageUrl,

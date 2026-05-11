@@ -1,3 +1,3 @@
 namespace PriceWatch.Application.DTOs.TrackedProduct;
 
-public record AddProductRequest(string Url, decimal TargetPrice);
+public record AddProductRequest(string Url, decimal TargetPrice, string? ListId = null);

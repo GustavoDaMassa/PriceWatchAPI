@@ -8,7 +8,7 @@ namespace PriceWatch.UnitTests.Domain.Entities;
 public class TrackedProductTests
 {
     private static TrackedProduct CreateProduct(decimal targetPrice = 100m) =>
-        TrackedProduct.Create("list-1", "user-1", "http://example.com", ProductSource.Manual, "Test Product", targetPrice);
+        TrackedProduct.Create("user-1", "http://example.com", ProductSource.Manual, "Test Product", targetPrice, "list-1");
 
     [Fact]
     public void Create_ShouldSetInitialValues_IsActiveTrue()

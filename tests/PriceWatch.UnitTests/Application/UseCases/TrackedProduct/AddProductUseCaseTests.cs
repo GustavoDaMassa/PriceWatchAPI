@@ -32,9 +32,9 @@ public class AddProductUseCaseTests
     [Fact]
     public async Task Execute_ShouldFetchPriceAndNameFromApi()
     {
-        var request = new AddProductRequest(MercadoLivreUrl, 100m);
+        var request = new AddProductRequest(MercadoLivreUrl, 100m, "list-1");
 
-        var result = await _useCase.ExecuteAsync("user-1", "list-1", request);
+        var result = await _useCase.ExecuteAsync("user-1", request);
 
         result.Should().NotBeNull();
         result.Name.Should().Be("Produto Teste");
@@ -46,17 +46,17 @@ public class AddProductUseCaseTests
     {
         var request = new AddProductRequest(MercadoLivreUrl, 100m);
 
-        await _useCase.ExecuteAsync("user-1", "list-1", request);
+        await _useCase.ExecuteAsync("user-1", request);
 
         _resolver.Verify(r => r.Resolve(MercadoLivreUrl), Times.Once);
     }
 
     [Fact]
-    public async Task Execute_ShouldPersistProductWithCorrectData()
+    public async Task Execute_WithListId_ShouldPersistWithListId()
     {
-        var request = new AddProductRequest(MercadoLivreUrl, 100m);
+        var request = new AddProductRequest(MercadoLivreUrl, 100m, "list-1");
 
-        await _useCase.ExecuteAsync("user-1", "list-1", request);
+        await _useCase.ExecuteAsync("user-1", request);
 
         _productRepo.Verify(r => r.CreateAsync(
             It.Is<DomainTrackedProduct>(p =>
@@ -64,6 +64,18 @@ public class AddProductUseCaseTests
                 p.UserId == "user-1" &&
                 p.CurrentPrice == 150m &&
                 p.LowestPrice == 150m)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_WithoutListId_ShouldPersistWithNullListId()
+    {
+        var request = new AddProductRequest(MercadoLivreUrl, 100m);
+
+        await _useCase.ExecuteAsync("user-1", request);
+
+        _productRepo.Verify(r => r.CreateAsync(
+            It.Is<DomainTrackedProduct>(p => p.ListId == null && p.UserId == "user-1")),
             Times.Once);
     }
 }

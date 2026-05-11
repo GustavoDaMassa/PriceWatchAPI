@@ -25,7 +25,7 @@ public class GetListAnalysisUseCase
         if (list.UserId != userId)
             throw new ProductListNotFoundException(listId);
 
-        var products = await _productRepository.GetByListIdAsync(listId);
+        var products = await _productRepository.GetByUserIdAsync(userId, listId);
 
         return products
             .Where(p => p.IsActive)

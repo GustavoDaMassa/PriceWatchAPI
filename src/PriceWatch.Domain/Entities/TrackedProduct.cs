@@ -5,7 +5,7 @@ namespace PriceWatch.Domain.Entities;
 public class TrackedProduct
 {
     public string Id { get; private set; } = default!;
-    public string ListId { get; private set; } = default!;
+    public string? ListId { get; private set; }
     public string UserId { get; private set; } = default!;
     public string Url { get; private set; } = default!;
     public ProductSource Source { get; private set; }
@@ -23,13 +23,16 @@ public class TrackedProduct
 
     private TrackedProduct() { }
 
+    public void AssignToList(string listId) => ListId = listId;
+    public void RemoveFromList() => ListId = null;
+
     public static TrackedProduct Create(
-        string listId,
         string userId,
         string url,
         ProductSource source,
         string name,
         decimal targetPrice,
+        string? listId = null,
         string? imageUrl = null)
     {
         return new TrackedProduct
@@ -54,7 +57,7 @@ public class TrackedProduct
 
     public static TrackedProduct Restore(
         string id,
-        string listId,
+        string? listId,
         string userId,
         string url,
         ProductSource source,

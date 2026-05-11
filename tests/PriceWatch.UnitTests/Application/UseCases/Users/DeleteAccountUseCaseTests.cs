@@ -5,7 +5,6 @@ using PriceWatch.Domain.Exceptions;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
 using Xunit;
-using DomainProductList = PriceWatch.Domain.Entities.ProductList;
 using DomainTrackedProduct = PriceWatch.Domain.Entities.TrackedProduct;
 using DomainUser = PriceWatch.Domain.Entities.User;
 
@@ -36,21 +35,18 @@ public class DeleteAccountUseCaseTests
     public async Task Execute_WithValidPassword_ShouldDeleteAllUserData()
     {
         var user = DomainUser.Create("A", "a@test.com", "hash", "tok");
-        var list = DomainProductList.Create(user.Id, "Lista", null);
-        var product = DomainTrackedProduct.Create(list.Id, user.Id, "url",
+        var product = DomainTrackedProduct.Create(user.Id, "url",
             PriceWatch.Domain.Enums.ProductSource.Manual, "Prod", 100m);
 
         _userRepo.Setup(r => r.GetByIdAsync(user.Id)).ReturnsAsync(user);
         _hasher.Setup(h => h.Verify("Pass123", "hash")).Returns(true);
-        _listRepo.Setup(r => r.GetByUserIdAsync(user.Id))
-            .ReturnsAsync(new List<DomainProductList> { list });
-        _productRepo.Setup(r => r.GetByListIdAsync(list.Id))
+        _productRepo.Setup(r => r.GetByUserIdAsync(user.Id, null))
             .ReturnsAsync(new List<DomainTrackedProduct> { product });
 
         await _useCase.ExecuteAsync(user.Id, "Pass123");
 
         _snapshotRepo.Verify(r => r.DeleteByProductIdAsync(product.Id), Times.Once);
-        _productRepo.Verify(r => r.DeleteByListIdAsync(list.Id), Times.Once);
+        _productRepo.Verify(r => r.DeleteAsync(product.Id), Times.Once);
         _listRepo.Verify(r => r.DeleteByUserIdAsync(user.Id), Times.Once);
         _notifRepo.Verify(r => r.DeleteByUserIdAsync(user.Id), Times.Once);
         _userRepo.Verify(r => r.DeleteAsync(user.Id), Times.Once);
