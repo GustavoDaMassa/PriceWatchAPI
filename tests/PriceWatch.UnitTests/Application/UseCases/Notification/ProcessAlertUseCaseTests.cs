@@ -24,7 +24,7 @@ public class ProcessAlertUseCaseTests
 
     private static User BuildUser(bool isEmailVerified)
     {
-        var user = User.Create("Test User", "user@test.com", "hash");
+        var user = User.Create("Test User", "user@test.com", "hash", "token-abc");
         if (isEmailVerified)
             user.VerifyEmail(user.EmailVerificationToken!);
         return user;

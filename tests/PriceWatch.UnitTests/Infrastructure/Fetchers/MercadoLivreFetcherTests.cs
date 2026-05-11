@@ -33,28 +33,47 @@ public class MercadoLivreFetcherTests
         return new MercadoLivreTokenService(new HttpClient(handler.Object), settings, NullLogger<MercadoLivreTokenService>.Instance);
     }
 
-    private static MercadoLivreFetcher BuildFetcher(HttpStatusCode status, string json)
+    private static MercadoLivreFetcher BuildFetcher(
+        string productJson = """{"name": "Produto Teste"}""",
+        string itemsJson = """{"results": [{"price": 1299.99}]}""",
+        HttpStatusCode productStatus = HttpStatusCode.OK,
+        HttpStatusCode itemsStatus = HttpStatusCode.OK)
     {
         var handler = new Mock<HttpMessageHandler>();
+
         handler.Protected()
             .Setup<Task<HttpResponseMessage>>("SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.Is<HttpRequestMessage>(r => r.RequestUri!.AbsolutePath.EndsWith("/items")),
                 ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage
             {
-                StatusCode = status,
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
+                StatusCode = itemsStatus,
+                Content = new StringContent(itemsJson, Encoding.UTF8, "application/json")
             });
+
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync",
+                ItExpr.Is<HttpRequestMessage>(r => !r.RequestUri!.AbsolutePath.EndsWith("/items")),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = productStatus,
+                Content = new StringContent(productJson, Encoding.UTF8, "application/json")
+            });
+
         return new MercadoLivreFetcher(new HttpClient(handler.Object), BuildTokenService());
     }
 
     [Theory]
-    [InlineData("https://produto.mercadolivre.com.br/MLB-1234567890-titulo-_JM")]
-    [InlineData("https://www.mercadolivre.com.br/titulo/p/MLB1234567890")]
-    [InlineData("https://www.mercadolivre.com.br/MLB1234567890-titulo-_JM")]
-    public async Task FetchAsync_ValidUrl_ReturnsPriceAndName(string url)
+    [InlineData("https://www.mercadolivre.com.br/smartphone/p/MLB67361578")]
+    [InlineData("https://www.mercadolivre.com.br/produto/p/MLB1234567890")]
+    [InlineData("https://www.mercadolivre.com.br/produto/p/MLB1234567890?filter=x")]
+    [InlineData("https://www.mercadolivre.com.br/produto/p/MLB1234567890#section")]
+    public async Task FetchAsync_CatalogUrl_ReturnsPriceAndName(string url)
     {
-        var fetcher = BuildFetcher(HttpStatusCode.OK, """{"price": 1299.99, "title": "Produto Teste"}""");
+        var fetcher = BuildFetcher(
+            productJson: """{"name": "Produto Teste"}""",
+            itemsJson: """{"results": [{"price": 1299.99}, {"price": 1399.00}]}""");
 
         var result = await fetcher.FetchAsync(url);
 
@@ -63,12 +82,25 @@ public class MercadoLivreFetcherTests
     }
 
     [Theory]
+    [InlineData("https://produto.mercadolivre.com.br/MLB-1234567890-titulo-_JM")]
+    [InlineData("https://www.mercadolivre.com.br/MLB1234567890-titulo-_JM")]
+    public async Task FetchAsync_ItemUrl_ThrowsBusinessExceptionWithHint(string url)
+    {
+        var fetcher = BuildFetcher();
+
+        var act = () => fetcher.FetchAsync(url);
+
+        await act.Should().ThrowAsync<BusinessException>()
+            .WithMessage("*catalog page URL*");
+    }
+
+    [Theory]
     [InlineData("https://www.amazon.com.br/produto/123")]
-    [InlineData("https://www.mercadolivre.com.br/sem-id-aqui")]
     [InlineData("invalid-url")]
+    [InlineData("https://www.mercadolivre.com.br/sem-id-aqui")]
     public async Task FetchAsync_InvalidUrl_ThrowsBusinessException(string url)
     {
-        var fetcher = BuildFetcher(HttpStatusCode.OK, """{"price": 100, "title": "X"}""");
+        var fetcher = BuildFetcher();
 
         var act = () => fetcher.FetchAsync(url);
 
@@ -77,25 +109,36 @@ public class MercadoLivreFetcherTests
     }
 
     [Fact]
-    public async Task FetchAsync_ApiReturnsError_ThrowsBusinessException()
+    public async Task FetchAsync_ProductApiReturnsError_ThrowsBusinessException()
     {
-        var fetcher = BuildFetcher(HttpStatusCode.NotFound, "{}");
+        var fetcher = BuildFetcher(productStatus: HttpStatusCode.NotFound);
 
-        var act = () => fetcher.FetchAsync("https://produto.mercadolivre.com.br/MLB-1234567890-titulo-_JM");
+        var act = () => fetcher.FetchAsync("https://www.mercadolivre.com.br/produto/p/MLB1234567890");
 
         await act.Should().ThrowAsync<BusinessException>()
             .WithMessage("*404*");
     }
 
-    [Theory]
-    [InlineData("""{"price": 0, "title": "X"}""")]
-    [InlineData("""{"price": null, "title": "X"}""")]
-    [InlineData("{}")]
-    public async Task FetchAsync_InvalidPrice_ThrowsBusinessException(string json)
+    [Fact]
+    public async Task FetchAsync_ItemsApiReturnsError_ThrowsBusinessException()
     {
-        var fetcher = BuildFetcher(HttpStatusCode.OK, json);
+        var fetcher = BuildFetcher(itemsStatus: HttpStatusCode.InternalServerError);
 
-        var act = () => fetcher.FetchAsync("https://produto.mercadolivre.com.br/MLB-1234567890-titulo-_JM");
+        var act = () => fetcher.FetchAsync("https://www.mercadolivre.com.br/produto/p/MLB1234567890");
+
+        await act.Should().ThrowAsync<BusinessException>()
+            .WithMessage("*500*");
+    }
+
+    [Theory]
+    [InlineData("""{"results": []}""")]
+    [InlineData("""{"results": [{"price": 0}]}""")]
+    [InlineData("""{"results": null}""")]
+    public async Task FetchAsync_NoValidPriceInItems_ThrowsBusinessException(string itemsJson)
+    {
+        var fetcher = BuildFetcher(itemsJson: itemsJson);
+
+        var act = () => fetcher.FetchAsync("https://www.mercadolivre.com.br/produto/p/MLB1234567890");
 
         await act.Should().ThrowAsync<BusinessException>()
             .WithMessage("*valid price*");

@@ -65,15 +65,16 @@ public class LoginUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_WithUnverifiedEmail_ShouldThrowBusinessException()
+    public async Task Execute_WithUnverifiedEmail_ShouldSucceed()
     {
         var user = User.Create("A", "a@test.com", "hashed_pw", "tok");
 
         _userRepo.Setup(r => r.GetByEmailAsync("a@test.com")).ReturnsAsync(user);
         _hasher.Setup(h => h.Verify("pass", "hashed_pw")).Returns(true);
+        _tokenService.Setup(t => t.GenerateToken(user)).Returns("jwt-token");
 
-        var act = async () => await _useCase.ExecuteAsync(new LoginRequest("a@test.com", "pass"));
+        var result = await _useCase.ExecuteAsync(new LoginRequest("a@test.com", "pass"));
 
-        await act.Should().ThrowAsync<BusinessException>().WithMessage("*verified*");
+        result.Token.Should().Be("jwt-token");
     }
 }

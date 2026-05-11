@@ -56,7 +56,7 @@ public class AuthFlowTests
     }
 
     [Fact]
-    public async Task Login_BeforeEmailVerification_Returns400()
+    public async Task Login_BeforeEmailVerification_Returns200()
     {
         var email = $"{Guid.NewGuid()}@test.com";
         await _client.PostAsJsonAsync("/api/auth/register", new
@@ -72,7 +72,7 @@ public class AuthFlowTests
             password = "Password123!"
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]

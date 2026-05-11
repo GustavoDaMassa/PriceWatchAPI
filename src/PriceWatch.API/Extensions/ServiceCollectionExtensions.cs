@@ -112,7 +112,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<MercadoLivreTokenService>();
         services.AddScoped<IPriceFetcher, MercadoLivreFetcher>();
         services.AddScoped<IPriceFetcherResolver, PriceFetcherResolver>();
-        services.AddHttpClient<MercadoLivreFetcher>();
+        services.AddHttpClient<MercadoLivreFetcher>(client =>
+        {
+            client.DefaultRequestHeaders.Add("User-Agent", "PriceWatchAPI/1.0");
+        });
         services.AddHostedService<PriceCheckWorker>();
 
         // Notification

@@ -28,33 +28,67 @@ public partial class MercadoLivreFetcher : IPriceFetcher
 
     public async Task<ProductFetchResult> FetchAsync(string url)
     {
-        var match = ItemIdRegex().Match(url);
-        if (!match.Success)
-            throw new BusinessException("Invalid Mercado Livre URL: could not extract item ID.");
+        var catalogMatch = CatalogIdRegex().Match(url);
+        if (!catalogMatch.Success)
+        {
+            if (ItemIdRegex().IsMatch(url))
+                throw new BusinessException(
+                    "Invalid Mercado Livre URL: please use the catalog page URL (containing /p/MLB...).");
+            throw new BusinessException("Invalid Mercado Livre URL: could not extract product ID.");
+        }
 
-        var itemId = $"MLB{match.Groups[1].Value}";
+        var catalogId = $"MLB{catalogMatch.Groups[1].Value}";
         var token = await _tokenService.GetTokenAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.mercadolibre.com/items/{itemId}");
+        var productTask = GetAsync<MercadoLivreProduct>(
+            $"https://api.mercadolibre.com/products/{catalogId}", token);
+        var itemsTask = GetAsync<MercadoLivreItemsResult>(
+            $"https://api.mercadolibre.com/products/{catalogId}/items", token);
+
+        await Task.WhenAll(productTask, itemsTask);
+
+        var product = await productTask;
+        var items = await itemsTask;
+
+        var minPrice = items.Results?
+            .Where(i => i.Price > 0)
+            .Min(i => (decimal?)i.Price) ?? 0;
+
+        if (minPrice <= 0)
+            throw new BusinessException($"Could not read a valid price for catalog product '{catalogId}'.");
+
+        return new ProductFetchResult(minPrice, product.Name ?? catalogId);
+    }
+
+    private async Task<T> GetAsync<T>(string url, string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await _httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode)
-            throw new BusinessException($"Mercado Livre API returned {(int)response.StatusCode} for item '{itemId}'.");
+            throw new BusinessException(
+                $"Mercado Livre API returned {(int)response.StatusCode} for '{url}'.");
 
         await using var stream = await response.Content.ReadAsStreamAsync();
-        var item = await JsonSerializer.DeserializeAsync<MercadoLivreItem>(stream);
-
-        if (item is null || item.Price <= 0)
-            throw new BusinessException($"Could not read a valid price for item '{itemId}'.");
-
-        return new ProductFetchResult(item.Price, item.Title);
+        return await JsonSerializer.DeserializeAsync<T>(stream)
+               ?? throw new BusinessException("Failed to parse Mercado Livre API response.");
     }
 
-    [GeneratedRegex(@"MLB-?(\d+)", RegexOptions.Compiled)]
+    // Matches catalog page URLs: /p/MLB123456
+    [GeneratedRegex(@"/p/MLB(\d+)", RegexOptions.Compiled)]
+    private static partial Regex CatalogIdRegex();
+
+    // Detects item-specific URLs (no /p/ prefix): MLB-123456 or MLB123456
+    [GeneratedRegex(@"(?<!/p/)MLB-?\d+", RegexOptions.Compiled)]
     private static partial Regex ItemIdRegex();
 
-    private record MercadoLivreItem(
-        [property: JsonPropertyName("price")] decimal Price,
-        [property: JsonPropertyName("title")] string Title);
+    private record MercadoLivreProduct(
+        [property: JsonPropertyName("name")] string? Name);
+
+    private record MercadoLivreItemsResult(
+        [property: JsonPropertyName("results")] List<MercadoLivreItemEntry>? Results);
+
+    private record MercadoLivreItemEntry(
+        [property: JsonPropertyName("price")] decimal Price);
 }
