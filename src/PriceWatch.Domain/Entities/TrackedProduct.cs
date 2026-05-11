@@ -29,7 +29,8 @@ public class TrackedProduct
         string url,
         ProductSource source,
         string name,
-        decimal targetPrice)
+        decimal targetPrice,
+        string? imageUrl = null)
     {
         return new TrackedProduct
         {
@@ -39,6 +40,7 @@ public class TrackedProduct
             Url = url,
             Source = source,
             Name = name,
+            ImageUrl = imageUrl,
             TargetPrice = targetPrice,
             CurrentPrice = 0m,
             LowestPrice = 0m,

@@ -21,7 +21,7 @@ public class AddProductUseCase
         var fetchResult = await fetcher.FetchAsync(request.Url);
 
         var product = Domain.Entities.TrackedProduct.Create(
-            listId, userId, request.Url, fetcher.ProductSource, fetchResult.Name, request.TargetPrice);
+            listId, userId, request.Url, fetcher.ProductSource, fetchResult.Name, request.TargetPrice, fetchResult.ImageUrl);
 
         product.RecordPrice(fetchResult.Price);
 
@@ -31,5 +31,5 @@ public class AddProductUseCase
     }
 
     private static TrackedProductResponse ToResponse(Domain.Entities.TrackedProduct p) =>
-        new(p.Id, p.ListId, p.Name, p.Url, p.Source, p.TargetPrice, p.CurrentPrice, p.LowestPrice, p.IsActive, p.NextCheckAt);
+        new(p.Id, p.ListId, p.Name, p.Url, p.ImageUrl, p.Source, p.TargetPrice, p.CurrentPrice, p.LowestPrice, p.IsActive, p.NextCheckAt);
 }

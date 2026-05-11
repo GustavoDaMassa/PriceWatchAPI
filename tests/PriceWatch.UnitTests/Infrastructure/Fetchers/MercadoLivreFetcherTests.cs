@@ -69,16 +69,29 @@ public class MercadoLivreFetcherTests
     [InlineData("https://www.mercadolivre.com.br/produto/p/MLB1234567890")]
     [InlineData("https://www.mercadolivre.com.br/produto/p/MLB1234567890?filter=x")]
     [InlineData("https://www.mercadolivre.com.br/produto/p/MLB1234567890#section")]
-    public async Task FetchAsync_CatalogUrl_ReturnsPriceAndName(string url)
+    public async Task FetchAsync_CatalogUrl_ReturnsPriceNameAndImage(string url)
     {
         var fetcher = BuildFetcher(
-            productJson: """{"name": "Produto Teste"}""",
+            productJson: """{"name": "Produto Teste", "pictures": [{"url": "https://img.mlstatic.com/produto.jpg"}]}""",
             itemsJson: """{"results": [{"price": 1299.99}, {"price": 1399.00}]}""");
 
         var result = await fetcher.FetchAsync(url);
 
         result.Price.Should().Be(1299.99m);
         result.Name.Should().Be("Produto Teste");
+        result.ImageUrl.Should().Be("https://img.mlstatic.com/produto.jpg");
+    }
+
+    [Fact]
+    public async Task FetchAsync_ProductWithoutPictures_ReturnsNullImageUrl()
+    {
+        var fetcher = BuildFetcher(
+            productJson: """{"name": "Produto Sem Imagem", "pictures": []}""",
+            itemsJson: """{"results": [{"price": 999.00}]}""");
+
+        var result = await fetcher.FetchAsync("https://www.mercadolivre.com.br/produto/p/MLB1234567890");
+
+        result.ImageUrl.Should().BeNull();
     }
 
     [Theory]

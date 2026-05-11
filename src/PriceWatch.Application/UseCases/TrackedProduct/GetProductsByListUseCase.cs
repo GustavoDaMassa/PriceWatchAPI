@@ -16,6 +16,6 @@ public class GetProductsByListUseCase
     {
         var products = await _repository.GetByListIdAsync(listId);
         return products.Select(p => new TrackedProductResponse(
-            p.Id, p.ListId, p.Name, p.Url, p.Source, p.TargetPrice, p.CurrentPrice, p.LowestPrice, p.IsActive, p.NextCheckAt));
+            p.Id, p.ListId, p.Name, p.Url, p.ImageUrl, p.Source, p.TargetPrice, p.CurrentPrice, p.LowestPrice, p.IsActive, p.NextCheckAt));
     }
 }

@@ -57,7 +57,9 @@ public partial class MercadoLivreFetcher : IPriceFetcher
         if (minPrice <= 0)
             throw new BusinessException($"Could not read a valid price for catalog product '{catalogId}'.");
 
-        return new ProductFetchResult(minPrice, product.Name ?? catalogId);
+        var imageUrl = product.Pictures?.FirstOrDefault()?.Url;
+
+        return new ProductFetchResult(minPrice, product.Name ?? catalogId, imageUrl);
     }
 
     private async Task<T> GetAsync<T>(string url, string token)
@@ -84,7 +86,11 @@ public partial class MercadoLivreFetcher : IPriceFetcher
     private static partial Regex ItemIdRegex();
 
     private record MercadoLivreProduct(
-        [property: JsonPropertyName("name")] string? Name);
+        [property: JsonPropertyName("name")] string? Name,
+        [property: JsonPropertyName("pictures")] List<MercadoLivrePicture>? Pictures);
+
+    private record MercadoLivrePicture(
+        [property: JsonPropertyName("url")] string? Url);
 
     private record MercadoLivreItemsResult(
         [property: JsonPropertyName("results")] List<MercadoLivreItemEntry>? Results);

@@ -7,6 +7,7 @@ public record TrackedProductResponse(
     string ListId,
     string Name,
     string Url,
+    string? ImageUrl,
     ProductSource Source,
     decimal TargetPrice,
     decimal CurrentPrice,
