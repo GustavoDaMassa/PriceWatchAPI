@@ -23,7 +23,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Email\Templates\*.html" />
+    <EmbeddedResource Include="Email/Templates/verification.en.html" WithCulture="false" />
+    <EmbeddedResource Include="Email/Templates/verification.pt-BR.html" WithCulture="false" />
+    <EmbeddedResource Include="Email/Templates/alert.en.html" WithCulture="false" />
+    <EmbeddedResource Include="Email/Templates/alert.pt-BR.html" WithCulture="false" />
   </ItemGroup>
 
 </Project>
