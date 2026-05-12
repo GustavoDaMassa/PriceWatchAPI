@@ -1,4 +1,5 @@
 using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using PriceWatch.Domain.Interfaces.Services;
@@ -9,6 +10,7 @@ namespace PriceWatch.Infrastructure.Email;
 public class SmtpEmailSender : IEmailSender
 {
     private readonly SmtpSettings _settings;
+    private readonly EmailTemplateRenderer _renderer = new();
 
     public SmtpEmailSender(IOptions<SmtpSettings> settings)
     {
@@ -17,35 +19,50 @@ public class SmtpEmailSender : IEmailSender
 
     public async Task SendVerificationEmailAsync(string email, string name, string token)
     {
-        var message = new MimeMessage();
-        message.From.Add(MailboxAddress.Parse(_settings.From));
-        message.To.Add(MailboxAddress.Parse(email));
-        message.Subject = "Verify your PriceWatch account";
-        message.Body = new TextPart("plain")
+        var verificationUrl =
+            $"{_settings.FrontendBaseUrl.TrimEnd('/')}/verify-email" +
+            $"?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
+
+        var html = _renderer.Render("verification", new()
         {
-            Text = $"Hello {name},\n\nYour verification token is: {token}\n\nUse it to verify your email."
-        };
+            ["name"] = name,
+            ["verificationUrl"] = verificationUrl,
+        });
 
-        using var client = new SmtpClient();
-        await client.ConnectAsync(_settings.Host, _settings.Port, false);
-
-        if (!string.IsNullOrEmpty(_settings.User) && !string.IsNullOrEmpty(_settings.Password))
-            await client.AuthenticateAsync(_settings.User, _settings.Password);
-
-        await client.SendAsync(message);
-        await client.DisconnectAsync(true);
+        await SendAsync(email, "Verify your PriceWatch account", html);
     }
 
     public async Task SendAlertEmailAsync(string email, string subject, string body)
     {
+        // Strip "PriceWatch: " prefix from subject to use as heading inside the email body
+        var heading = subject.StartsWith("PriceWatch: ")
+            ? subject["PriceWatch: ".Length..]
+            : subject;
+
+        var html = _renderer.Render("alert", new()
+        {
+            ["heading"] = heading,
+            ["message"] = body,
+            ["appUrl"] = _settings.FrontendBaseUrl.TrimEnd('/'),
+        });
+
+        await SendAsync(email, subject, html);
+    }
+
+    private async Task SendAsync(string to, string subject, string htmlBody)
+    {
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse(_settings.From));
-        message.To.Add(MailboxAddress.Parse(email));
+        message.To.Add(MailboxAddress.Parse(to));
         message.Subject = subject;
-        message.Body = new TextPart("plain") { Text = body };
+        message.Body = new TextPart("html") { Text = htmlBody };
 
         using var client = new SmtpClient();
-        await client.ConnectAsync(_settings.Host, _settings.Port, false);
+        var secure = _settings.Port == 465
+            ? SecureSocketOptions.SslOnConnect
+            : SecureSocketOptions.StartTlsWhenAvailable;
+
+        await client.ConnectAsync(_settings.Host, _settings.Port, secure);
 
         if (!string.IsNullOrEmpty(_settings.User) && !string.IsNullOrEmpty(_settings.Password))
             await client.AuthenticateAsync(_settings.User, _settings.Password);
