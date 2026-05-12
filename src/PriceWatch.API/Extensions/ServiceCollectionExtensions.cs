@@ -150,6 +150,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AddProductUseCase>();
         services.AddScoped<GetUserProductsUseCase>();
         services.AddScoped<UpdateProductUseCase>();
+        services.AddScoped<AssignProductToListUseCase>();
         services.AddScoped<RemoveProductUseCase>();
         services.AddScoped<GetPriceHistoryUseCase>();
 

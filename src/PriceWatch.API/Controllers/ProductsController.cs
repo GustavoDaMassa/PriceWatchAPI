@@ -17,6 +17,7 @@ public class ProductsController : ControllerBase
     private readonly GetUserProductsUseCase _getProducts;
     private readonly AddProductUseCase _addProduct;
     private readonly UpdateProductUseCase _updateProduct;
+    private readonly AssignProductToListUseCase _assignToList;
     private readonly RemoveProductUseCase _removeProduct;
     private readonly GetPriceHistoryUseCase _getPriceHistory;
 
@@ -24,12 +25,14 @@ public class ProductsController : ControllerBase
         GetUserProductsUseCase getProducts,
         AddProductUseCase addProduct,
         UpdateProductUseCase updateProduct,
+        AssignProductToListUseCase assignToList,
         RemoveProductUseCase removeProduct,
         GetPriceHistoryUseCase getPriceHistory)
     {
         _getProducts = getProducts;
         _addProduct = addProduct;
         _updateProduct = updateProduct;
+        _assignToList = assignToList;
         _removeProduct = removeProduct;
         _getPriceHistory = getPriceHistory;
     }
@@ -72,6 +75,20 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> UpdateProduct(string id, [FromBody] UpdateProductRequest request)
     {
         await _updateProduct.ExecuteAsync(id, GetUserId(), request);
+        return NoContent();
+    }
+
+    /// <summary>Atribui ou remove o produto de uma lista.</summary>
+    /// <param name="id">ID do produto.</param>
+    /// <remarks>Envie listId com o ID da lista para atribuir, ou null para remover da lista atual.</remarks>
+    /// <response code="204">Atualizado com sucesso.</response>
+    /// <response code="404">Produto ou lista não encontrados.</response>
+    [HttpPatch("{id}/list")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AssignToList(string id, [FromBody] AssignToListRequest request)
+    {
+        await _assignToList.ExecuteAsync(id, GetUserId(), request);
         return NoContent();
     }
 
