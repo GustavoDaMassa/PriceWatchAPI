@@ -57,6 +57,12 @@ public class MongoDbIndexInitializer
         await col.Indexes.CreateOneAsync(new CreateIndexModel<TrackedProductDocument>(
             Builders<TrackedProductDocument>.IndexKeys.Ascending(p => p.UserId),
             new CreateIndexOptions { Name = "idx_tracked_products_userId" }));
+
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<TrackedProductDocument>(
+            Builders<TrackedProductDocument>.IndexKeys
+                .Ascending(p => p.UserId)
+                .Ascending(p => p.Url),
+            new CreateIndexOptions { Unique = true, Name = "idx_tracked_products_userId_url_unique" }));
     }
 
     private async Task CreatePriceSnapshotIndexesAsync()

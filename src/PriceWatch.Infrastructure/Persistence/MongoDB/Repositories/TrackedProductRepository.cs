@@ -33,6 +33,14 @@ public class TrackedProductRepository : ITrackedProductRepository
         return doc is null ? null : TrackedProductMappings.ToDomain(doc);
     }
 
+    public async Task<TrackedProduct?> GetByUserIdAndUrlAsync(string userId, string url)
+    {
+        var doc = await _collection
+            .Find(d => d.UserId == userId && d.Url == url)
+            .FirstOrDefaultAsync();
+        return doc is null ? null : TrackedProductMappings.ToDomain(doc);
+    }
+
     public async Task<IEnumerable<TrackedProduct>> GetDueForCheckAsync()
     {
         var now = DateTime.UtcNow;

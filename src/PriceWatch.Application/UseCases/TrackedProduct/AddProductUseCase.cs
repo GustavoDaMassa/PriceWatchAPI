@@ -17,6 +17,18 @@ public class AddProductUseCase
 
     public async Task<TrackedProductResponse> ExecuteAsync(string userId, AddProductRequest request)
     {
+        var existing = await _repository.GetByUserIdAndUrlAsync(userId, request.Url);
+
+        if (existing is not null)
+        {
+            if (!existing.IsActive)
+            {
+                existing.Activate();
+                await _repository.UpdateAsync(existing);
+            }
+            return ToResponse(existing);
+        }
+
         var fetcher = _resolver.Resolve(request.Url);
         var fetchResult = await fetcher.FetchAsync(request.Url);
 
