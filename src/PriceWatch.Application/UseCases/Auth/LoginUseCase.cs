@@ -30,6 +30,6 @@ public class LoginUseCase
             throw new BusinessException("Invalid credentials.");
 
         var token = _tokenService.GenerateToken(user);
-        return new AuthResponse(token, user.Email, user.Name);
+        return new AuthResponse(token, user.Email, user.Name, user.IsEmailVerified);
     }
 }
