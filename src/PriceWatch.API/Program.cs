@@ -2,6 +2,15 @@ using PriceWatch.API.Extensions;
 using PriceWatch.API.Middleware;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
 
+var localEnvPath = Path.Combine(Directory.GetCurrentDirectory(), "local.env");
+if (File.Exists(localEnvPath))
+    foreach (var line in File.ReadAllLines(localEnvPath)
+        .Where(l => !string.IsNullOrWhiteSpace(l) && !l.TrimStart().StartsWith('#')))
+    {
+        var eq = line.IndexOf('=');
+        if (eq > 0) Environment.SetEnvironmentVariable(line[..eq].Trim(), line[(eq + 1)..].Trim());
+    }
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
