@@ -19,7 +19,9 @@ public class UpdateProductUseCase
         if (product is null || product.UserId != userId)
             throw new TrackedProductNotFoundException(productId);
 
-        if (!request.IsActive)
+        if (request.IsActive)
+            product.Activate();
+        else
             product.Deactivate();
 
         await _repository.UpdateAsync(product);

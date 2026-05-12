@@ -111,5 +111,6 @@ public class TrackedProduct
 
     public bool ShouldTriggerLowestAlert(decimal previousLowest) => CurrentPrice < previousLowest;
 
+    public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;
 }
