@@ -1,3 +1,3 @@
 namespace PriceWatch.Application.DTOs.Auth;
 
-public record RegisterRequest(string Name, string Email, string Password);
+public record RegisterRequest(string Name, string Email, string Password, string Locale = "en");

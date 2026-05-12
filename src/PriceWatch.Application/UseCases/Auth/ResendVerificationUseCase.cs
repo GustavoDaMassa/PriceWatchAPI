@@ -24,6 +24,6 @@ public class ResendVerificationUseCase
         user.RegenerateVerificationToken(newToken);
 
         await _userRepository.UpdateAsync(user);
-        await _emailSender.SendVerificationEmailAsync(user.Email, user.Name, newToken);
+        await _emailSender.SendVerificationEmailAsync(user.Email, user.Name, newToken, user.Locale);
     }
 }

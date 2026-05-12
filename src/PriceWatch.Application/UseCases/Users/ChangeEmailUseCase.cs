@@ -29,6 +29,6 @@ public class ChangeEmailUseCase
         user.ChangeEmail(request.NewEmail, verificationToken);
 
         await _userRepository.UpdateAsync(user);
-        await _emailSender.SendVerificationEmailAsync(user.Email, user.Name, verificationToken);
+        await _emailSender.SendVerificationEmailAsync(user.Email, user.Name, verificationToken, user.Locale);
     }
 }

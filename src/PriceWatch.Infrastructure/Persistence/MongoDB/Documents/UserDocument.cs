@@ -18,6 +18,9 @@ public class UserDocument
     [BsonElement("passwordHash")]
     public string PasswordHash { get; set; } = default!;
 
+    [BsonElement("locale")]
+    public string Locale { get; set; } = "en";
+
     [BsonElement("isEmailVerified")]
     public bool IsEmailVerified { get; set; }
 

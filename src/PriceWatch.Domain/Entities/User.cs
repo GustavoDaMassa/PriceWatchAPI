@@ -8,6 +8,7 @@ public class User
     public string Name { get; private set; } = default!;
     public string Email { get; private set; } = default!;
     public string PasswordHash { get; private set; } = default!;
+    public string Locale { get; private set; } = "en";
     public bool IsEmailVerified { get; private set; }
     public string? EmailVerificationToken { get; private set; }
     public DateTime? TokenExpiresAt { get; private set; }
@@ -20,6 +21,7 @@ public class User
         string name,
         string email,
         string passwordHash,
+        string locale,
         bool isEmailVerified,
         string? emailVerificationToken,
         DateTime? tokenExpiresAt,
@@ -31,6 +33,7 @@ public class User
             Name = name,
             Email = email,
             PasswordHash = passwordHash,
+            Locale = locale,
             IsEmailVerified = isEmailVerified,
             EmailVerificationToken = emailVerificationToken,
             TokenExpiresAt = tokenExpiresAt,
@@ -43,6 +46,7 @@ public class User
         string email,
         string passwordHash,
         string verificationToken,
+        string locale = "en",
         DateTime? tokenExpiresAt = null)
     {
         return new User
@@ -51,6 +55,7 @@ public class User
             Name = name,
             Email = email,
             PasswordHash = passwordHash,
+            Locale = locale,
             IsEmailVerified = false,
             EmailVerificationToken = verificationToken,
             TokenExpiresAt = tokenExpiresAt ?? DateTime.UtcNow.AddHours(24),

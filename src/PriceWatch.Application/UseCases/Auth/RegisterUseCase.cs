@@ -30,9 +30,9 @@ public class RegisterUseCase
 
         var passwordHash = _passwordHasher.Hash(request.Password);
         var verificationToken = Guid.NewGuid().ToString();
-        var user = User.Create(request.Name, request.Email, passwordHash, verificationToken);
+        var user = User.Create(request.Name, request.Email, passwordHash, verificationToken, request.Locale);
 
         await _userRepository.CreateAsync(user);
-        await _emailSender.SendVerificationEmailAsync(user.Email, user.Name, verificationToken);
+        await _emailSender.SendVerificationEmailAsync(user.Email, user.Name, verificationToken, user.Locale);
     }
 }

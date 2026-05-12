@@ -38,6 +38,6 @@ public class ProcessAlertUseCase
             ? $"PriceWatch: '{productName}' reached your target price!"
             : $"PriceWatch: New lowest price for '{productName}'!";
 
-        await _emailSender.SendAlertEmailAsync(user.Email, subject, notification.Message);
+        await _emailSender.SendAlertEmailAsync(user.Email, subject, notification.Message, user.Locale);
     }
 }
