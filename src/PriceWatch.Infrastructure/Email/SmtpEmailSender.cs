@@ -17,29 +17,32 @@ public class SmtpEmailSender : IEmailSender
         _settings = settings.Value;
     }
 
-    public async Task SendVerificationEmailAsync(string email, string name, string token)
+    public async Task SendVerificationEmailAsync(string email, string name, string token, string locale = "en")
     {
         var verificationUrl =
             $"{_settings.FrontendBaseUrl.TrimEnd('/')}/verify-email" +
             $"?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
 
-        var html = _renderer.Render("verification", new()
+        var subject = locale == "pt-BR"
+            ? "Confirme seu email no PriceWatch"
+            : "Verify your PriceWatch account";
+
+        var html = _renderer.Render("verification", locale, new()
         {
             ["name"] = name,
             ["verificationUrl"] = verificationUrl,
         });
 
-        await SendAsync(email, "Verify your PriceWatch account", html);
+        await SendAsync(email, subject, html);
     }
 
-    public async Task SendAlertEmailAsync(string email, string subject, string body)
+    public async Task SendAlertEmailAsync(string email, string subject, string body, string locale = "en")
     {
-        // Strip "PriceWatch: " prefix from subject to use as heading inside the email body
         var heading = subject.StartsWith("PriceWatch: ")
             ? subject["PriceWatch: ".Length..]
             : subject;
 
-        var html = _renderer.Render("alert", new()
+        var html = _renderer.Render("alert", locale, new()
         {
             ["heading"] = heading,
             ["message"] = body,
