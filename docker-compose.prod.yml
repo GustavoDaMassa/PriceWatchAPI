@@ -2,6 +2,8 @@ services:
   pricewatch-api:
     image: gustavodamassa/pricewatch-api:latest
     container_name: pricewatch-api
+    ports:
+      - "8083:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
@@ -36,17 +38,6 @@ services:
   pricewatch-redis:
     image: redis:7-alpine
     container_name: pricewatch-redis
-    restart: unless-stopped
-
-  pricewatch-nginx:
-    image: nginx:alpine
-    container_name: pricewatch-nginx
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - pricewatch-api
     restart: unless-stopped
 
   pricewatch-watchtower:
