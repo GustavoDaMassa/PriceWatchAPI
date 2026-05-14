@@ -18,6 +18,7 @@ public class TrackedProduct
     public DateTime NextCheckAt { get; private set; }
     public DateTime? LastCheckedAt { get; private set; }
     public bool IsActive { get; private set; } = true;
+    public bool TargetAlertSent { get; private set; }
     public Dictionary<string, string> Metadata { get; private set; } = new();
     public DateTime CreatedAt { get; private set; }
 
@@ -50,6 +51,7 @@ public class TrackedProduct
             CheckIntervalHours = 1,
             NextCheckAt = DateTime.UtcNow,
             IsActive = true,
+            TargetAlertSent = false,
             Metadata = new Dictionary<string, string>(),
             CreatedAt = DateTime.UtcNow
         };
@@ -70,6 +72,7 @@ public class TrackedProduct
         DateTime nextCheckAt,
         DateTime? lastCheckedAt,
         bool isActive,
+        bool targetAlertSent,
         Dictionary<string, string> metadata,
         DateTime createdAt)
     {
@@ -89,6 +92,7 @@ public class TrackedProduct
             NextCheckAt = nextCheckAt,
             LastCheckedAt = lastCheckedAt,
             IsActive = isActive,
+            TargetAlertSent = targetAlertSent,
             Metadata = metadata,
             CreatedAt = createdAt
         };
@@ -101,15 +105,21 @@ public class TrackedProduct
         if (LowestPrice == 0m || price < LowestPrice)
             LowestPrice = price;
 
+        if (TargetPrice > 0 && price > TargetPrice)
+            TargetAlertSent = false;
+
         LastCheckedAt = DateTime.UtcNow;
         NextCheckAt = DateTime.UtcNow.AddHours(CheckIntervalHours);
 
         return PriceSnapshot.Create(Id, price);
     }
 
-    public bool ShouldTriggerTargetAlert() => CurrentPrice <= TargetPrice;
+    public bool ShouldTriggerTargetAlert() =>
+        TargetPrice > 0 && CurrentPrice <= TargetPrice && !TargetAlertSent;
 
     public bool ShouldTriggerLowestAlert(decimal previousLowest) => CurrentPrice < previousLowest;
+
+    public void MarkTargetAlertSent() => TargetAlertSent = true;
 
     public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;

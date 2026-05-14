@@ -61,12 +61,18 @@ public class PriceCheckWorker : BackgroundService
                 var snapshot = product.RecordPrice(fetchResult.Price);
 
                 await snapshotRepo.CreateAsync(snapshot);
-                await productRepo.UpdateAsync(product);
 
                 if (product.ShouldTriggerTargetAlert())
+                {
+                    product.MarkTargetAlertSent();
                     await alertPublisher.PublishAsync(product.Id, product.UserId, product.Name, NotificationType.TargetPriceReached, fetchResult.Price);
+                }
                 else if (product.ShouldTriggerLowestAlert(previousLowest))
+                {
                     await alertPublisher.PublishAsync(product.Id, product.UserId, product.Name, NotificationType.NewLowestPrice, fetchResult.Price);
+                }
+
+                await productRepo.UpdateAsync(product);
             }
             catch (Exception ex)
             {

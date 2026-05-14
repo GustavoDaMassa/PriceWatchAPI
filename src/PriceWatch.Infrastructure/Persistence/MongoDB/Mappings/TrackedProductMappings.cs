@@ -21,6 +21,7 @@ public static class TrackedProductMappings
         NextCheckAt = product.NextCheckAt,
         LastCheckedAt = product.LastCheckedAt,
         IsActive = product.IsActive,
+        TargetAlertSent = product.TargetAlertSent,
         Metadata = product.Metadata,
         CreatedAt = product.CreatedAt
     };
@@ -40,6 +41,7 @@ public static class TrackedProductMappings
         doc.NextCheckAt,
         doc.LastCheckedAt,
         doc.IsActive,
+        doc.TargetAlertSent,
         doc.Metadata,
         doc.CreatedAt);
 }

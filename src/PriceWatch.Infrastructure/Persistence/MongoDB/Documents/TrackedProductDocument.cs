@@ -49,6 +49,9 @@ public class TrackedProductDocument
     [BsonElement("isActive")]
     public bool IsActive { get; set; }
 
+    [BsonElement("targetAlertSent")]
+    public bool TargetAlertSent { get; set; }
+
     [BsonElement("metadata")]
     public Dictionary<string, string> Metadata { get; set; } = new();
 
