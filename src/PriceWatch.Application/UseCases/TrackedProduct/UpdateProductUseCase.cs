@@ -19,6 +19,8 @@ public class UpdateProductUseCase
         if (product is null || product.UserId != userId)
             throw new TrackedProductNotFoundException(productId);
 
+        product.SetTargetPrice(request.TargetPrice);
+
         if (request.IsActive)
             product.Activate();
         else

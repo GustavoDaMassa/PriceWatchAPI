@@ -113,4 +113,5 @@ public class TrackedProduct
 
     public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;
+    public void SetTargetPrice(decimal targetPrice) => TargetPrice = targetPrice;
 }
