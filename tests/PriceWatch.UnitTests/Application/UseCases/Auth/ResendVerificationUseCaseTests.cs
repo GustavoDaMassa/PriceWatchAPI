@@ -30,7 +30,7 @@ public class ResendVerificationUseCaseTests
 
         _userRepo.Verify(r => r.UpdateAsync(user), Times.Once);
         _emailSender.Verify(
-            s => s.SendVerificationEmailAsync("a@test.com", "A", It.IsAny<string>()),
+            s => s.SendVerificationEmailAsync("a@test.com", "A", It.IsAny<string>(), It.IsAny<string>()),
             Times.Once);
     }
 

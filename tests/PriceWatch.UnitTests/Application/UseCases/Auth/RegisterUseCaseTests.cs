@@ -32,7 +32,7 @@ public class RegisterUseCaseTests
 
         _userRepo.Verify(r => r.CreateAsync(It.Is<User>(u => u.Email == "new@test.com")), Times.Once);
         _emailSender.Verify(
-            s => s.SendVerificationEmailAsync("new@test.com", "Test", It.IsAny<string>()),
+            s => s.SendVerificationEmailAsync("new@test.com", "Test", It.IsAny<string>(), It.IsAny<string>()),
             Times.Once);
     }
 

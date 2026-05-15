@@ -34,7 +34,7 @@ public class ChangeEmailUseCaseTests
         user.IsEmailVerified.Should().BeFalse();
         _userRepo.Verify(r => r.UpdateAsync(user), Times.Once);
         _emailSender.Verify(
-            s => s.SendVerificationEmailAsync("new@test.com", "A", It.IsAny<string>()),
+            s => s.SendVerificationEmailAsync("new@test.com", "A", It.IsAny<string>(), It.IsAny<string>()),
             Times.Once);
     }
 

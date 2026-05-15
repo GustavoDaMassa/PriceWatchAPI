@@ -49,7 +49,7 @@ public class ProcessAlertUseCaseTests
 
         await _useCase.ExecuteAsync("user-1", "prod-1", "Produto X", NotificationType.TargetPriceReached, 89m);
 
-        _emailSender.Verify(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        _emailSender.Verify(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public class ProcessAlertUseCaseTests
 
         await _useCase.ExecuteAsync("user-1", "prod-1", "Produto X", NotificationType.TargetPriceReached, 89m);
 
-        _emailSender.Verify(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        _emailSender.Verify(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
@@ -67,12 +67,12 @@ public class ProcessAlertUseCaseTests
     {
         var user = BuildUser(isEmailVerified: true);
         _userRepo.Setup(r => r.GetByIdAsync("user-1")).ReturnsAsync(user);
-        _emailSender.Setup(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+        _emailSender.Setup(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .Returns(Task.CompletedTask);
 
         await _useCase.ExecuteAsync("user-1", "prod-1", "Produto X", NotificationType.TargetPriceReached, 89m);
 
-        _emailSender.Verify(e => e.SendAlertEmailAsync("user@test.com", It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+        _emailSender.Verify(e => e.SendAlertEmailAsync("user@test.com", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public class ProcessAlertUseCaseTests
     {
         var user = BuildUser(isEmailVerified: true);
         _userRepo.Setup(r => r.GetByIdAsync("user-1")).ReturnsAsync(user);
-        _emailSender.Setup(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+        _emailSender.Setup(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .Returns(Task.CompletedTask);
 
         await _useCase.ExecuteAsync("user-1", "prod-1", "Produto X", NotificationType.TargetPriceReached, 89m);
@@ -88,6 +88,7 @@ public class ProcessAlertUseCaseTests
         _emailSender.Verify(e => e.SendAlertEmailAsync(
             It.IsAny<string>(),
             It.Is<string>(s => s.Contains("target price")),
+            It.IsAny<string>(),
             It.IsAny<string>()),
             Times.Once);
     }
@@ -97,7 +98,7 @@ public class ProcessAlertUseCaseTests
     {
         var user = BuildUser(isEmailVerified: true);
         _userRepo.Setup(r => r.GetByIdAsync("user-1")).ReturnsAsync(user);
-        _emailSender.Setup(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+        _emailSender.Setup(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .Returns(Task.CompletedTask);
 
         await _useCase.ExecuteAsync("user-1", "prod-1", "Produto X", NotificationType.NewLowestPrice, 75m);
@@ -105,6 +106,7 @@ public class ProcessAlertUseCaseTests
         _emailSender.Verify(e => e.SendAlertEmailAsync(
             It.IsAny<string>(),
             It.Is<string>(s => s.Contains("lowest price")),
+            It.IsAny<string>(),
             It.IsAny<string>()),
             Times.Once);
     }

@@ -63,7 +63,7 @@ public class UserTests
     [Fact]
     public void VerifyEmail_WithExpiredToken_ShouldThrowBusinessException()
     {
-        var user = User.Create("A", "a@test.com", "h", "token", DateTime.UtcNow.AddHours(-1));
+        var user = User.Create("A", "a@test.com", "h", "token", tokenExpiresAt: DateTime.UtcNow.AddHours(-1));
 
         var act = () => user.VerifyEmail("token");
 
