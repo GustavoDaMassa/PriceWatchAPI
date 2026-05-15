@@ -32,6 +32,8 @@ services:
       Smtp__Password: ${SMTP_PASSWORD}
       Smtp__FrontendBaseUrl: ${SMTP_FRONTEND_BASE_URL}
       AllowedOrigins__0: "https://pricewatch.gustavohdev.com.br"
+      MercadoLivre__ClientId: ${MERCADOLIVRE_CLIENT_ID}
+      MercadoLivre__ClientSecret: ${MERCADOLIVRE_CLIENT_SECRET}
     depends_on:
       - pricewatch-mongo
       - pricewatch-redis
