@@ -14,19 +14,22 @@ public class CreateOfferUseCase
     private readonly IUserProductSubscriptionRepository _subscriptions;
     private readonly IPriceFetcherResolver _fetcherResolver;
     private readonly IProductMatchingEventPublisher _matchingEventPublisher;
+    private readonly SyncOfferActivityUseCase _syncActivity;
 
     public CreateOfferUseCase(
         IProductRepository products,
         IStoreOfferRepository offers,
         IUserProductSubscriptionRepository subscriptions,
         IPriceFetcherResolver fetcherResolver,
-        IProductMatchingEventPublisher matchingEventPublisher)
+        IProductMatchingEventPublisher matchingEventPublisher,
+        SyncOfferActivityUseCase syncActivity)
     {
         _products = products;
         _offers = offers;
         _subscriptions = subscriptions;
         _fetcherResolver = fetcherResolver;
         _matchingEventPublisher = matchingEventPublisher;
+        _syncActivity = syncActivity;
     }
 
     public async Task<OfferResponse> ExecuteAsync(string userId, CreateOfferRequest request)
@@ -79,6 +82,9 @@ public class CreateOfferUseCase
             await _subscriptions.UpdateAsync(subscription);
         }
 
+        // uma oferta só é monitorada se tiver assinante ativo (reativa ofertas pausadas)
+        await _syncActivity.ExecuteAsync(product.Id);
+
         return ToResponse(subscription, product, offer);
     }
 
@@ -95,5 +101,6 @@ public class CreateOfferUseCase
             offer.CurrentPrice,
             offer.LowestPrice,
             subscription.IsActive,
-            offer.NextCheckAt);
+            offer.NextCheckAt,
+            subscription.ListId);
 }
