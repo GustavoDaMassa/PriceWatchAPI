@@ -13,18 +13,18 @@ namespace PriceWatch.API.Controllers;
 [Produces("application/json")]
 public class OffersController : ControllerBase
 {
-    private readonly CreateOfferUseCase _createOffer;
+    private readonly ImportFromLinkUseCase _importFromLink;
     private readonly GetProductComparisonUseCase _getComparison;
     private readonly RedirectOfferUseCase _redirectOffer;
     private readonly ILogger<OffersController> _logger;
 
     public OffersController(
-        CreateOfferUseCase createOffer,
+        ImportFromLinkUseCase importFromLink,
         GetProductComparisonUseCase getComparison,
         RedirectOfferUseCase redirectOffer,
         ILogger<OffersController> logger)
     {
-        _createOffer = createOffer;
+        _importFromLink = importFromLink;
         _getComparison = getComparison;
         _redirectOffer = redirectOffer;
         _logger = logger;
@@ -32,18 +32,20 @@ public class OffersController : ControllerBase
 
     /// <summary>Adiciona uma oferta (URL de uma loja) para acompanhamento.</summary>
     /// <remarks>
-    /// O sistema detecta a loja automaticamente pela URL. Se já existir uma oferta pra essa
-    /// URL, reaproveita o produto-mestre já existente. O casamento automático com outras
+    /// O sistema normaliza a URL (descarta parâmetros de campanha), segue links curtos de
+    /// compartilhamento e detecta a loja automaticamente. Se já existir uma oferta pra essa
+    /// URL, reaproveita o produto-mestre já existente. O corpo aceita <c>clientData</c> opcional
+    /// (GTIN, marca, modelo, imagem lidos pela extensão/app) que só completa dados faltantes. O casamento automático com outras
     /// lojas roda de forma assíncrona (não bloqueia esta resposta).
     /// </remarks>
     /// <response code="201">Oferta adicionada e acompanhamento iniciado.</response>
-    /// <response code="400">URL não suportada ou produto não encontrado.</response>
+    /// <response code="400">URL inválida, loja não suportada ou produto não encontrado.</response>
     [HttpPost("/api/offers")]
     [ProducesResponseType(typeof(OfferResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateOffer([FromBody] CreateOfferRequest request)
     {
-        var result = await _createOffer.ExecuteAsync(GetUserId(), request);
+        var result = await _importFromLink.ExecuteAsync(GetUserId(), request);
         return StatusCode(201, result);
     }
 
@@ -69,7 +71,7 @@ public class OffersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RedirectToOffer(string id)
     {
-        var result = await _redirectOffer.ExecuteAsync(id);
+        var result = await _redirectOffer.ExecuteAsync(id, GetUserId());
 
         _logger.LogInformation(
             "Affiliate redirect click: offer {OfferId}, source {Source}, user {UserId}",
@@ -78,6 +80,30 @@ public class OffersController : ControllerBase
         return Redirect(result.AffiliateUrl);
     }
 
+    /// <summary>Registra o clique e devolve a URL da loja (link de afiliado) em JSON.</summary>
+    /// <remarks>
+    /// Equivalente ao GET /redirect para clientes que não conseguem anexar o JWT a uma navegação
+    /// (SPA, extensão, app): o cliente chama este endpoint e abre a URL devolvida.
+    /// </remarks>
+    /// <param name="id">ID da oferta.</param>
+    /// <response code="200">URL de destino.</response>
+    /// <response code="404">Oferta não encontrada.</response>
+    [HttpPost("/api/offers/{id}/click")]
+    [ProducesResponseType(typeof(OfferClickResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ClickOffer(string id)
+    {
+        var result = await _redirectOffer.ExecuteAsync(id, GetUserId());
+
+        _logger.LogInformation(
+            "Affiliate click: offer {OfferId}, source {Source}, user {UserId}",
+            result.OfferId, result.Source, GetUserId());
+
+        return Ok(new OfferClickResponse(result.AffiliateUrl));
+    }
+
     private string GetUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier)
         ?? throw new BusinessException("User ID not found in token.");
 }
+
+public record OfferClickResponse(string Url);

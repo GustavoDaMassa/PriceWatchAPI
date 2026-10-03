@@ -13,6 +13,7 @@ using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
 using PriceWatch.Application.UseCases.Offers;
 using PriceWatch.Application.UseCases.ProductList;
+using PriceWatch.Application.UseCases.Stores;
 using PriceWatch.Application.UseCases.TrackedProduct;
 using PriceWatch.Application.UseCases.Users;
 using PriceWatch.Domain.Interfaces.Repositories;
@@ -21,6 +22,7 @@ using PriceWatch.Infrastructure.Affiliates;
 using PriceWatch.Infrastructure.Email;
 using PriceWatch.Infrastructure.Fetchers;
 using PriceWatch.Infrastructure.Messaging;
+using PriceWatch.Infrastructure.Network;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Repositories;
 using PriceWatch.Infrastructure.Security;
 using PriceWatch.Infrastructure.Settings;
@@ -151,9 +153,25 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IStoreOfferRepository, StoreOfferRepository>();
         services.AddScoped<IUserProductSubscriptionRepository, UserProductSubscriptionRepository>();
+        services.AddScoped<IClickLogRepository, ClickLogRepository>();
         services.AddHostedService<BackfillWorker>();
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
         services.AddHostedService<ProductMatchingConsumer>();
+
+        // resolução de links curtos com defesa contra SSRF (só IPs públicos, validado também na conexão)
+        services.AddSingleton<IHostAddressResolver, DnsHostAddressResolver>();
+        services.AddHttpClient<IUrlResolver, SafeUrlResolver>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(15);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "Mozilla/5.0 (compatible; PriceWatchBot/1.0; +https://pricewatch.gustavohdev.com.br)");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                ConnectTimeout = TimeSpan.FromSeconds(5),
+                ConnectCallback = SafeUrlResolver.ConnectAsync
+            });
 
         // Lomadee/SocialSoul — agregador de afiliados escolhido na Fase 6 (cobre Kabum, ver docs/arquitetura.md)
         services.Configure<LomadeeSettings>(configuration.GetSection("Lomadee"));
@@ -212,7 +230,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RedirectOfferUseCase>();
         services.AddScoped<BackfillTrackedProductsUseCase>();
         services.AddScoped<MatchStoreOfferUseCase>();
+        services.AddScoped<ICreateOfferUseCase>(sp => sp.GetRequiredService<CreateOfferUseCase>());
+        services.AddScoped<ImportFromLinkUseCase>();
         services.AddScoped<CheckOfferPriceUseCase>();
+        services.AddScoped<GetSupportedStoresUseCase>();
         services.AddScoped<LegacyProductCatalogFacade>();
         services.AddScoped<UnifiedProductCatalogFacade>();
         // escolhido a cada request pela flag (lazy via IOptions): cutover e rollback sem novo deploy

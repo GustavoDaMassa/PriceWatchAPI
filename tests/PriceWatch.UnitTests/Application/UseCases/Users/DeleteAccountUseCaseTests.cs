@@ -22,6 +22,7 @@ public class DeleteAccountUseCaseTests
     private readonly Mock<INotificationRepository> _notifRepo = new();
     private readonly Mock<IUserProductSubscriptionRepository> _subscriptionRepo = new();
     private readonly Mock<IStoreOfferRepository> _offerRepo = new();
+    private readonly Mock<IClickLogRepository> _clickRepo = new();
     private readonly DeleteAccountUseCase _useCase;
 
     public DeleteAccountUseCaseTests()
@@ -34,7 +35,8 @@ public class DeleteAccountUseCaseTests
             _snapshotRepo.Object,
             _notifRepo.Object,
             _subscriptionRepo.Object,
-            new SyncOfferActivityUseCase(_offerRepo.Object, _subscriptionRepo.Object));
+            new SyncOfferActivityUseCase(_offerRepo.Object, _subscriptionRepo.Object),
+            _clickRepo.Object);
     }
 
     [Fact]
@@ -55,6 +57,7 @@ public class DeleteAccountUseCaseTests
         _productRepo.Verify(r => r.DeleteAsync(product.Id), Times.Once);
         _listRepo.Verify(r => r.DeleteByUserIdAsync(user.Id), Times.Once);
         _notifRepo.Verify(r => r.DeleteByUserIdAsync(user.Id), Times.Once);
+        _clickRepo.Verify(r => r.DeleteByUserIdAsync(user.Id), Times.Once);
         _userRepo.Verify(r => r.DeleteAsync(user.Id), Times.Once);
     }
 

@@ -39,7 +39,7 @@ public class UnifiedProductCatalogFacadeTests
         var sync = new SyncOfferActivityUseCase(_offers.Object, _subscriptions.Object);
         var createOffer = new CreateOfferUseCase(
             _products.Object, _offers.Object, _subscriptions.Object, _fetchers.Object,
-            new Mock<IProductMatchingEventPublisher>().Object, sync);
+            new Mock<IProductMatchingEventPublisher>().Object, sync, new Mock<IAffiliateLinkResolver>().Object);
 
         _facade = new UnifiedProductCatalogFacade(
             _subscriptions.Object, _products.Object, _offers.Object, _snapshots.Object,

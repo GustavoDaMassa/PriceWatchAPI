@@ -22,6 +22,8 @@ public class PriceFetcherResolver : IPriceFetcherResolver
         return fetcher;
     }
 
+    public bool CanHandle(string url) => _fetchers.Any(f => f.CanHandle(url));
+
     public IPriceFetcher Resolve(string url)
     {
         var fetcher = _fetchers.FirstOrDefault(f => f.CanHandle(url));

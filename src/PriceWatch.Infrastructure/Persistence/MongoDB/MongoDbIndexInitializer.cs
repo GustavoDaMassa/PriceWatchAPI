@@ -22,6 +22,7 @@ public class MongoDbIndexInitializer
         await CreateProductIndexesAsync();
         await CreateStoreOfferIndexesAsync();
         await CreateUserProductSubscriptionIndexesAsync();
+        await CreateClickLogIndexesAsync();
     }
 
     private async Task CreateUserIndexesAsync()
@@ -97,6 +98,23 @@ public class MongoDbIndexInitializer
                 .Ascending(n => n.UserId)
                 .Descending(n => n.CreatedAt),
             new CreateIndexOptions { Name = "idx_notifications_userId_createdAt" }));
+    }
+
+    private async Task CreateClickLogIndexesAsync()
+    {
+        var col = _database.GetCollection<ClickLogDocument>("click_logs");
+
+        // relatório de cliques por oferta, mais recentes primeiro
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<ClickLogDocument>(
+            Builders<ClickLogDocument>.IndexKeys
+                .Ascending(c => c.OfferId)
+                .Descending(c => c.CreatedAt),
+            new CreateIndexOptions { Name = "idx_click_logs_offerId_createdAt" }));
+
+        // exclusão de conta (LGPD)
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<ClickLogDocument>(
+            Builders<ClickLogDocument>.IndexKeys.Ascending(c => c.UserId),
+            new CreateIndexOptions { Name = "idx_click_logs_userId" }));
     }
 
     private async Task CreateProductIndexesAsync()
