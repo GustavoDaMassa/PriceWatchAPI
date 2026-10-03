@@ -27,6 +27,7 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .WriteTo.Console(
         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}"));
 
+builder.Services.AddProxyHeaders();
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks()
     .AddCheck<PriceWatch.API.Health.DependenciesHealthCheck>("dependencies", tags: new[] { "ready" });
@@ -115,6 +116,7 @@ app.Use(async (context, next) =>
         await next();
 });
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseCors();
 app.UseAuthentication();
