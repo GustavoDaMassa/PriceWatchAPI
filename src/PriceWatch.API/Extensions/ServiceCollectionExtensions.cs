@@ -132,6 +132,7 @@ public static class ServiceCollectionExtensions
             .AddPolicyHandler(GetRetryPolicy())
             .AddPolicyHandler(GetCircuitBreakerPolicy());
         services.AddHostedService<PriceCheckWorker>();
+        services.AddHostedService<StoreOfferPriceCheckWorker>();
 
         // Notification
         services.AddScoped<INotificationRepository, NotificationRepository>();
@@ -210,6 +211,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RedirectOfferUseCase>();
         services.AddScoped<BackfillTrackedProductsUseCase>();
         services.AddScoped<MatchStoreOfferUseCase>();
+        services.AddScoped<CheckOfferPriceUseCase>();
+        services.AddScoped<SyncOfferActivityUseCase>();
 
         return services;
     }
