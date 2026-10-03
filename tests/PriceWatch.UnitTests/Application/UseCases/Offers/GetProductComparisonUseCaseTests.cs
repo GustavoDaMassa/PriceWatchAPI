@@ -84,4 +84,24 @@ public class GetProductComparisonUseCaseTests
 
         result.Offers.Should().ContainSingle(o => o.OfferId == active.Id);
     }
+
+    [Fact]
+    public async Task Execute_ShouldExposeStoreNameLowestPriceAndWhenThePriceWasLastChecked()
+    {
+        var product = Product.Create("iPhone 15 128GB");
+        var offer = StoreOffer.Create(product.Id, ProductSource.Kabum, "https://kabum.com/item");
+        offer.RecordPrice(80m);
+        offer.RecordPrice(100m);
+        _products.Setup(r => r.GetByIdAsync(product.Id)).ReturnsAsync(product);
+        _offers.Setup(r => r.GetByProductIdAsync(product.Id)).ReturnsAsync([offer]);
+
+        var result = await _useCase.ExecuteAsync(product.Id);
+
+        var summary = result.Offers.Single();
+        summary.StoreName.Should().Be("KaBuM!");
+        summary.LowestPrice.Should().Be(80m);
+        summary.CurrentPrice.Should().Be(100m);
+        summary.LastCheckedAt.Should().Be(offer.LastCheckedAt);
+        summary.LastCheckedAt.Should().NotBeNull();
+    }
 }
