@@ -42,6 +42,27 @@ public class KabumFetcherTests
         return new KabumFetcher(new HttpClient(handler.Object), settings);
     }
 
+    private static KabumFetcher BuildFetcherWithSettings(LomadeeSettings settings) =>
+        new(new HttpClient(new Mock<HttpMessageHandler>().Object), Options.Create(settings));
+
+    [Fact]
+    public void CanHandle_WhenLomadeeIsNotConfigured_ReturnsFalseSoTheUrlIsTreatedAsUnsupported()
+    {
+        var fetcher = BuildFetcherWithSettings(new LomadeeSettings());
+
+        fetcher.CanHandle(ProductUrl).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("https://www.kabum.com.br/produto/123456/placa-de-video-rtx-4060", true)]
+    [InlineData("https://www.mercadolivre.com.br/produto/123", false)]
+    public void CanHandle_WhenLomadeeIsConfigured_MatchesOnlyKabumUrls(string url, bool expected)
+    {
+        var fetcher = BuildFetcherWithSettings(new LomadeeSettings { AppToken = "t", SourceId = "s" });
+
+        fetcher.CanHandle(url).Should().Be(expected);
+    }
+
     [Fact]
     public async Task FetchAsync_WithExactLinkMatch_ReturnsPriceNameImageAndBarcode()
     {

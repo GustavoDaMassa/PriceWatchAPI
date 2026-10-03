@@ -24,7 +24,8 @@ public class LomadeeDeeplinkGenerator : IAffiliateLinkGenerator
 
     public ProductSource ProductSource => ProductSource.Kabum;
 
-    public bool CanHandle(string url) => url.Contains("kabum.com.br", StringComparison.OrdinalIgnoreCase);
+    public bool CanHandle(string url) =>
+        _settings.IsConfigured && url.Contains("kabum.com.br", StringComparison.OrdinalIgnoreCase);
 
     public LomadeeDeeplinkGenerator(HttpClient httpClient, IOptions<LomadeeSettings> settings, ILogger<LomadeeDeeplinkGenerator> logger)
     {

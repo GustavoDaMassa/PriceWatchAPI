@@ -96,6 +96,17 @@ public class LomadeeDeeplinkGeneratorTests
     }
 
     [Fact]
+    public void CanHandle_WhenLomadeeIsNotConfigured_ReturnsFalseSoThePassthroughIsUsed()
+    {
+        var generator = new LomadeeDeeplinkGenerator(
+            new HttpClient(new Mock<HttpMessageHandler>().Object),
+            Options.Create(new LomadeeSettings()),
+            NullLogger<LomadeeDeeplinkGenerator>.Instance);
+
+        generator.CanHandle(OriginalUrl).Should().BeFalse();
+    }
+
+    [Fact]
     public void ProductSource_ShouldBeKabum()
     {
         var generator = BuildGenerator();
