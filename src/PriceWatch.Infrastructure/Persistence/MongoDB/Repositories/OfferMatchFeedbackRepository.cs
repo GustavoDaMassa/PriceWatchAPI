@@ -30,6 +30,12 @@ public class OfferMatchFeedbackRepository : IOfferMatchFeedbackRepository
         return docs.Select(OfferMatchFeedbackMappings.ToDomain);
     }
 
+    public async Task<IEnumerable<OfferMatchFeedback>> GetByUserIdAsync(string userId)
+    {
+        var docs = await _collection.Find(d => d.UserId == userId).ToListAsync();
+        return docs.Select(OfferMatchFeedbackMappings.ToDomain);
+    }
+
     public async Task<int> CountTrackVotesAsync(string candidateId)
     {
         var count = await _collection.CountDocumentsAsync(

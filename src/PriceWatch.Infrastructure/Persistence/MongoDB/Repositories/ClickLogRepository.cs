@@ -25,6 +25,12 @@ public class ClickLogRepository : IClickLogRepository
         return await _collection.CountDocumentsAsync(d => d.OfferId == offerId);
     }
 
+    public async Task<IEnumerable<ClickLog>> GetByUserIdAsync(string userId)
+    {
+        var docs = await _collection.Find(d => d.UserId == userId).ToListAsync();
+        return docs.Select(ClickLogMappings.ToDomain);
+    }
+
     public async Task DeleteByUserIdAsync(string userId)
     {
         await _collection.DeleteManyAsync(d => d.UserId == userId);

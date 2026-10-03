@@ -18,17 +18,20 @@ public class UsersController : ControllerBase
     private readonly ChangePasswordUseCase _changePassword;
     private readonly ChangeEmailUseCase _changeEmail;
     private readonly DeleteAccountUseCase _deleteAccount;
+    private readonly ExportUserDataUseCase _exportData;
 
     public UsersController(
         GetProfileUseCase getProfile,
         ChangePasswordUseCase changePassword,
         ChangeEmailUseCase changeEmail,
-        DeleteAccountUseCase deleteAccount)
+        DeleteAccountUseCase deleteAccount,
+        ExportUserDataUseCase exportData)
     {
         _getProfile = getProfile;
         _changePassword = changePassword;
         _changeEmail = changeEmail;
         _deleteAccount = deleteAccount;
+        _exportData = exportData;
     }
 
     /// <summary>Retorna o perfil do usuário autenticado.</summary>
@@ -69,6 +72,16 @@ public class UsersController : ControllerBase
     {
         await _changeEmail.ExecuteAsync(GetUserId(), request);
         return NoContent();
+    }
+
+    /// <summary>Exporta uma cópia dos dados pessoais do usuário (LGPD).</summary>
+    /// <remarks>Não inclui hash de senha, tokens de verificação nem o token push do aparelho.</remarks>
+    /// <response code="200">Perfil, listas, produtos, assinaturas, notificações, cliques, votos de correspondência e dispositivos.</response>
+    [HttpGet("me/export")]
+    [ProducesResponseType(typeof(UserDataExport), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportData()
+    {
+        return Ok(await _exportData.ExecuteAsync(GetUserId()));
     }
 
     /// <summary>Exclui permanentemente a conta e todos os dados associados.</summary>
