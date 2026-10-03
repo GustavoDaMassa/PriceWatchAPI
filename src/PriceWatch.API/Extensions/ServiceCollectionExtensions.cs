@@ -16,6 +16,7 @@ using PriceWatch.Application.UseCases.TrackedProduct;
 using PriceWatch.Application.UseCases.Users;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
+using PriceWatch.Infrastructure.Affiliates;
 using PriceWatch.Infrastructure.Email;
 using PriceWatch.Infrastructure.Fetchers;
 using PriceWatch.Infrastructure.Messaging;
@@ -150,6 +151,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
         services.AddHostedService<ProductMatchingConsumer>();
 
+        // Passthrough sempre por último — CanHandle universal funciona como fallback do resolver
+        services.AddScoped<IAffiliateLinkGenerator, PassthroughAffiliateLinkGenerator>();
+        services.AddScoped<IAffiliateLinkResolver, AffiliateLinkResolver>();
+
         return services;
     }
 
@@ -188,6 +193,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<DeleteAccountUseCase>();
 
         // Offers (pivô multi-loja)
+        services.AddScoped<CreateOfferUseCase>();
+        services.AddScoped<GetProductComparisonUseCase>();
+        services.AddScoped<RedirectOfferUseCase>();
         services.AddScoped<MatchStoreOfferUseCase>();
 
         return services;

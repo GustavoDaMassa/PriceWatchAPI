@@ -24,6 +24,7 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
     private const string TestJwtAudience = "PriceWatchUsers";
 
     public FakeEmailSender FakeEmail { get; } = new();
+    public FakePriceFetcher FakeFetcher { get; } = new();
 
     private readonly MongoDbContainer _mongo = new MongoDbBuilder()
         .WithImage("mongo:7.0")
@@ -104,6 +105,10 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
             // substitui email real pelo fake
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(FakeEmail);
+
+            // substitui o fetcher real (chamaria a API do Mercado Livre de verdade) por um fake
+            services.RemoveAll<IPriceFetcher>();
+            services.AddSingleton<IPriceFetcher>(FakeFetcher);
         });
     }
 }
