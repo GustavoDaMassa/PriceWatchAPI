@@ -24,6 +24,9 @@ public class UnifiedProductCatalogFacadeTests
     private readonly Mock<IProductListRepository> _lists = new();
     private readonly Mock<IPriceFetcherResolver> _fetchers = new();
     private readonly Mock<IPriceFetcher> _fetcher = new();
+    private readonly Mock<IClickLogRepository> _clicks = new();
+    private readonly Mock<IAffiliateLinkResolver> _affiliateResolver = new();
+    private readonly Mock<IAffiliateLinkGenerator> _affiliateGenerator = new();
     private readonly UnifiedProductCatalogFacade _facade;
 
     private const string UserId = "user-1";
@@ -41,9 +44,13 @@ public class UnifiedProductCatalogFacadeTests
             _products.Object, _offers.Object, _subscriptions.Object, _fetchers.Object,
             new Mock<IProductMatchingEventPublisher>().Object, sync, new Mock<IAffiliateLinkResolver>().Object);
 
+        _affiliateResolver.Setup(r => r.Resolve(It.IsAny<ProductSource>())).Returns(_affiliateGenerator.Object);
+        _affiliateGenerator.Setup(g => g.GenerateAsync(It.IsAny<string>())).ReturnsAsync((string url) => url);
+
         _facade = new UnifiedProductCatalogFacade(
             _subscriptions.Object, _products.Object, _offers.Object, _snapshots.Object,
-            _lists.Object, _fetchers.Object, createOffer, sync);
+            _lists.Object, _fetchers.Object, createOffer, sync,
+            new RedirectOfferUseCase(_offers.Object, _affiliateResolver.Object, _clicks.Object));
 
         _products.Setup(r => r.GetByIdAsync(_product.Id)).ReturnsAsync(_product);
         _products.Setup(r => r.GetByIdsAsync(It.IsAny<IEnumerable<string>>())).ReturnsAsync(new[] { _product });
@@ -285,5 +292,32 @@ public class UnifiedProductCatalogFacadeTests
         var act = () => _facade.GetListAnalysisAsync(foreignList.Id, UserId);
 
         await act.Should().ThrowAsync<ProductListNotFoundException>();
+    }
+
+    [Fact]
+    public async Task OpenProduct_ClicksTheCheapestActiveOfferAndReturnsItsLink()
+    {
+        var sub = Subscription();
+        var expensive = Offer(1200m, 1100m, "https://ml/a");
+        var cheap = Offer(1000m, 950m, "https://kabum/b", ProductSource.Kabum);
+        cheap.SetAffiliateUrl("https://afiliado/?u=kabum");
+        OffersAre(expensive, cheap);
+        _offers.Setup(r => r.GetByIdAsync(cheap.Id)).ReturnsAsync(cheap);
+
+        var url = await _facade.OpenProductAsync(sub.Id, UserId);
+
+        url.Should().Be("https://afiliado/?u=kabum");
+        _clicks.Verify(r => r.CreateAsync(It.Is<ClickLog>(c => c.OfferId == cheap.Id && c.UserId == UserId)), Times.Once);
+    }
+
+    [Fact]
+    public async Task OpenProduct_OfAnotherUser_ThrowsNotFoundAndRecordsNoClick()
+    {
+        var sub = Subscription();
+
+        var act = () => _facade.OpenProductAsync(sub.Id, "someone-else");
+
+        await act.Should().ThrowAsync<TrackedProductNotFoundException>();
+        _clicks.Verify(r => r.CreateAsync(It.IsAny<ClickLog>()), Times.Never);
     }
 }

@@ -19,4 +19,10 @@ public interface IProductCatalogFacade
     Task RemoveProductAsync(string productId, string userId);
     Task<IEnumerable<PriceSnapshotResponse>> GetPriceHistoryAsync(string productId, string userId);
     Task<IEnumerable<AnalysisItemDto>> GetListAnalysisAsync(string listId, string userId);
+
+    /// <summary>
+    /// URL de saída para a loja de um item (link de afiliado quando há rede) registrando o clique. Os
+    /// clientes chamam isto em vez de abrir a URL da loja direto (RF17).
+    /// </summary>
+    Task<string> OpenProductAsync(string productId, string userId);
 }

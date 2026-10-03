@@ -257,6 +257,30 @@ public abstract class LegacyProductContractTests
     }
 
     [Fact]
+    public async Task ClickProduct_ReturnsTheStoreUrlAndOnlyForTheOwner()
+    {
+        var alice = await NewAuthenticatedClientAsync();
+        var bob = await NewAuthenticatedClientAsync();
+        var url = NewUrl();
+        var id = (await AddProductAsync(alice, url, 100m)).GetProperty("id").GetString()!;
+
+        var own = await alice.PostAsync($"/api/products/{id}/click", content: null);
+        var other = await bob.PostAsync($"/api/products/{id}/click", content: null);
+
+        own.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await own.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("url").GetString().Should().Be(url);
+        other.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ClickProduct_WithoutToken_Returns401()
+    {
+        var response = await _factory.CreateClient().PostAsync("/api/products/x/click", content: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task GetPriceHistory_ReturnsAnArrayForTheOwnerAnd404ForOthers()
     {
         var alice = await NewAuthenticatedClientAsync();

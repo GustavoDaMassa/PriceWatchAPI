@@ -25,6 +25,7 @@ public class UnifiedProductCatalogFacade : IProductCatalogFacade
     private readonly IPriceFetcherResolver _fetchers;
     private readonly CreateOfferUseCase _createOffer;
     private readonly SyncOfferActivityUseCase _syncActivity;
+    private readonly RedirectOfferUseCase _redirectOffer;
 
     public UnifiedProductCatalogFacade(
         IUserProductSubscriptionRepository subscriptions,
@@ -34,7 +35,8 @@ public class UnifiedProductCatalogFacade : IProductCatalogFacade
         IProductListRepository lists,
         IPriceFetcherResolver fetchers,
         CreateOfferUseCase createOffer,
-        SyncOfferActivityUseCase syncActivity)
+        SyncOfferActivityUseCase syncActivity,
+        RedirectOfferUseCase redirectOffer)
     {
         _subscriptions = subscriptions;
         _products = products;
@@ -44,6 +46,7 @@ public class UnifiedProductCatalogFacade : IProductCatalogFacade
         _fetchers = fetchers;
         _createOffer = createOffer;
         _syncActivity = syncActivity;
+        _redirectOffer = redirectOffer;
     }
 
     public async Task<IEnumerable<TrackedProductResponse>> GetUserProductsAsync(string userId, string? listId)
@@ -176,6 +179,16 @@ public class UnifiedProductCatalogFacade : IProductCatalogFacade
                 i.TargetPrice == 0 ? 0 :
                     Math.Round((i.CurrentPrice - i.TargetPrice) / i.TargetPrice * 100, 2)))
             .OrderBy(a => a.DistancePercent);
+    }
+
+    public async Task<string> OpenProductAsync(string productId, string userId)
+    {
+        var subscription = await GetOwnedAsync(productId, userId);
+
+        var primary = PrimaryOffer(await _offers.GetByProductIdAsync(subscription.ProductId))
+            ?? throw new StoreOfferNotFoundException(subscription.ProductId);
+
+        return (await _redirectOffer.ExecuteAsync(primary.Id, userId)).AffiliateUrl;
     }
 
     private async Task<UserProductSubscription> GetOwnedAsync(string subscriptionId, string userId)
