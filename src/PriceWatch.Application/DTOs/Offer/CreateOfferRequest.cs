@@ -1,3 +1,7 @@
 namespace PriceWatch.Application.DTOs.Offer;
 
-public record CreateOfferRequest(string Url, decimal TargetPrice, string? ListId = null);
+public record CreateOfferRequest(
+    string Url,
+    decimal TargetPrice,
+    string? ListId = null,
+    ClientProductData? ClientData = null);

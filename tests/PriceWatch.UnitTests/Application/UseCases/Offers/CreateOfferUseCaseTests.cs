@@ -20,6 +20,8 @@ public class CreateOfferUseCaseTests
     private readonly Mock<IPriceFetcherResolver> _resolver = new();
     private readonly Mock<IPriceFetcher> _fetcher = new();
     private readonly Mock<IProductMatchingEventPublisher> _matchingEventPublisher = new();
+    private readonly Mock<IAffiliateLinkResolver> _affiliateResolver = new();
+    private readonly Mock<IAffiliateLinkGenerator> _affiliateGenerator = new();
     private readonly CreateOfferUseCase _useCase;
 
     private const string MercadoLivreUrl = "https://produto.mercadolivre.com.br/MLB-123-titulo-_JM";
@@ -27,6 +29,7 @@ public class CreateOfferUseCaseTests
     public CreateOfferUseCaseTests()
     {
         _resolver.Setup(r => r.Resolve(It.IsAny<string>())).Returns(_fetcher.Object);
+        _affiliateResolver.Setup(r => r.Resolve(It.IsAny<ProductSource>())).Returns(_affiliateGenerator.Object);
         _fetcher.Setup(f => f.ProductSource).Returns(ProductSource.MercadoLivre);
         _fetcher.Setup(f => f.FetchAsync(It.IsAny<string>()))
             .ReturnsAsync(new ProductFetchResult(150m, "iPhone 15 128GB", Gtin: "00190199719729"));
@@ -38,7 +41,8 @@ public class CreateOfferUseCaseTests
 
         _useCase = new CreateOfferUseCase(
             _products.Object, _offers.Object, _subscriptions.Object, _resolver.Object, _matchingEventPublisher.Object,
-            new SyncOfferActivityUseCase(_offers.Object, _subscriptions.Object));
+            new SyncOfferActivityUseCase(_offers.Object, _subscriptions.Object),
+            _affiliateResolver.Object);
     }
 
     [Fact]
@@ -161,5 +165,101 @@ public class CreateOfferUseCaseTests
 
         inactiveOffer.IsActive.Should().BeTrue();
         _offers.Verify(r => r.UpdateAsync(inactiveOffer), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ClientDataFillsBrandAndModelOnlyWhenTheStoreDidNotProvideThem()
+    {
+        _fetcher.Setup(f => f.FetchAsync(It.IsAny<string>()))
+            .ReturnsAsync(new ProductFetchResult(150m, "iPhone 15 128GB", Brand: "Apple"));
+        var clientData = new ClientProductData(Brand: "OutraMarca", Model: "  A3092  ");
+
+        await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 100m, ClientData: clientData));
+
+        _products.Verify(r => r.CreateAsync(It.Is<Product>(p => p.Brand == "Apple" && p.Model == "A3092")), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ClientDataNeverOverridesTheStorePriceNameOrGtin()
+    {
+        var clientData = new ClientProductData(Brand: "Marca", Model: "Modelo");
+
+        var result = await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 100m, ClientData: clientData));
+
+        result.Name.Should().Be("iPhone 15 128GB");
+        result.CurrentPrice.Should().Be(150m);
+        _products.Verify(r => r.CreateAsync(It.Is<Product>(p => p.Gtin == "00190199719729")), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ClientDataCannotInjectAGtinIntoTheSharedCatalog()
+    {
+        // a loja não devolveu GTIN: nada vindo do cliente pode preencher a chave de matching
+        _fetcher.Setup(f => f.FetchAsync(It.IsAny<string>())).ReturnsAsync(new ProductFetchResult(150m, "Produto"));
+        var clientData = new ClientProductData(Brand: "Marca", Model: "Modelo");
+
+        await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 100m, ClientData: clientData));
+
+        _products.Verify(r => r.CreateAsync(It.Is<Product>(p => p.Gtin == null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_OverlongClientBrandIsIgnored()
+    {
+        _fetcher.Setup(f => f.FetchAsync(It.IsAny<string>())).ReturnsAsync(new ProductFetchResult(150m, "Produto"));
+        var clientData = new ClientProductData(Brand: new string('x', 500));
+
+        await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 100m, ClientData: clientData));
+
+        _products.Verify(r => r.CreateAsync(It.Is<Product>(p => p.Brand == null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_WhenANetworkIsAvailable_StoresTheAffiliateLinkOnTheNewOffer()
+    {
+        _affiliateGenerator.Setup(g => g.IsAvailable).Returns(true);
+        _affiliateGenerator.Setup(g => g.GenerateAsync(MercadoLivreUrl)).ReturnsAsync("https://afiliado.com/?u=abc");
+
+        var result = await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 100m));
+
+        _offers.Verify(r => r.CreateAsync(It.Is<StoreOffer>(o => o.AffiliateUrl == "https://afiliado.com/?u=abc")), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_WhenNoNetworkIsAvailable_LeavesTheAffiliateLinkEmptyForALaterRedirect()
+    {
+        _affiliateGenerator.Setup(g => g.IsAvailable).Returns(false);
+
+        await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 100m));
+
+        _offers.Verify(r => r.CreateAsync(It.Is<StoreOffer>(o => o.AffiliateUrl == null)), Times.Once);
+        _affiliateGenerator.Verify(g => g.GenerateAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Execute_WhenTheNetworkFailsAndEchoesTheUrl_DoesNotCacheItAsAnAffiliateLink()
+    {
+        _affiliateGenerator.Setup(g => g.IsAvailable).Returns(true);
+        _affiliateGenerator.Setup(g => g.GenerateAsync(MercadoLivreUrl)).ReturnsAsync(MercadoLivreUrl);
+
+        await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 100m));
+
+        _offers.Verify(r => r.CreateAsync(It.Is<StoreOffer>(o => o.AffiliateUrl == null)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ForAnExistingOfferWithoutAffiliateLink_GeneratesAndSavesIt()
+    {
+        var existingProduct = Product.Create("iPhone 15 128GB");
+        var existingOffer = StoreOffer.Create(existingProduct.Id, ProductSource.MercadoLivre, MercadoLivreUrl);
+        _offers.Setup(r => r.GetBySourceAndUrlAsync(ProductSource.MercadoLivre, MercadoLivreUrl)).ReturnsAsync(existingOffer);
+        _products.Setup(r => r.GetByIdAsync(existingProduct.Id)).ReturnsAsync(existingProduct);
+        _affiliateGenerator.Setup(g => g.IsAvailable).Returns(true);
+        _affiliateGenerator.Setup(g => g.GenerateAsync(MercadoLivreUrl)).ReturnsAsync("https://afiliado.com/?u=abc");
+
+        await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 100m));
+
+        existingOffer.AffiliateUrl.Should().Be("https://afiliado.com/?u=abc");
+        _offers.Verify(r => r.UpdateAsync(existingOffer), Times.AtLeastOnce);
     }
 }

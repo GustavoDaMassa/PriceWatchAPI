@@ -22,6 +22,7 @@ using PriceWatch.Infrastructure.Affiliates;
 using PriceWatch.Infrastructure.Email;
 using PriceWatch.Infrastructure.Fetchers;
 using PriceWatch.Infrastructure.Messaging;
+using PriceWatch.Infrastructure.Network;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Repositories;
 using PriceWatch.Infrastructure.Security;
 using PriceWatch.Infrastructure.Settings;
@@ -157,6 +158,21 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
         services.AddHostedService<ProductMatchingConsumer>();
 
+        // resolução de links curtos com defesa contra SSRF (só IPs públicos, validado também na conexão)
+        services.AddSingleton<IHostAddressResolver, DnsHostAddressResolver>();
+        services.AddHttpClient<IUrlResolver, SafeUrlResolver>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(15);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "Mozilla/5.0 (compatible; PriceWatchBot/1.0; +https://pricewatch.gustavohdev.com.br)");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                ConnectTimeout = TimeSpan.FromSeconds(5),
+                ConnectCallback = SafeUrlResolver.ConnectAsync
+            });
+
         // Lomadee/SocialSoul — agregador de afiliados escolhido na Fase 6 (cobre Kabum, ver docs/arquitetura.md)
         services.Configure<LomadeeSettings>(configuration.GetSection("Lomadee"));
         services.AddScoped<IPriceFetcher, KabumFetcher>();
@@ -214,6 +230,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RedirectOfferUseCase>();
         services.AddScoped<BackfillTrackedProductsUseCase>();
         services.AddScoped<MatchStoreOfferUseCase>();
+        services.AddScoped<ICreateOfferUseCase>(sp => sp.GetRequiredService<CreateOfferUseCase>());
+        services.AddScoped<ImportFromLinkUseCase>();
         services.AddScoped<CheckOfferPriceUseCase>();
         services.AddScoped<GetSupportedStoresUseCase>();
         services.AddScoped<LegacyProductCatalogFacade>();
