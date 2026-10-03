@@ -25,9 +25,20 @@ public class GetSupportedStoresUseCaseTests
         return generator;
     }
 
+    private static Mock<IOfferSearcher> Searcher(ProductSource source, bool available)
+    {
+        var searcher = new Mock<IOfferSearcher>();
+        searcher.Setup(s => s.ProductSource).Returns(source);
+        searcher.Setup(s => s.IsAvailable).Returns(available);
+        return searcher;
+    }
+
     private static GetSupportedStoresUseCase Build(
-        IEnumerable<Mock<IPriceFetcher>> fetchers, IEnumerable<Mock<IAffiliateLinkGenerator>> generators) =>
-        new(fetchers.Select(f => f.Object), generators.Select(g => g.Object));
+        IEnumerable<Mock<IPriceFetcher>> fetchers,
+        IEnumerable<Mock<IAffiliateLinkGenerator>> generators,
+        IEnumerable<Mock<IOfferSearcher>>? searchers = null) =>
+        new(fetchers.Select(f => f.Object), generators.Select(g => g.Object),
+            (searchers ?? []).Select(x => x.Object));
 
     [Fact]
     public void Execute_ListsEveryKnownStoreWithNameAndHomeUrl_ExceptManual()
@@ -72,10 +83,19 @@ public class GetSupportedStoresUseCaseTests
     }
 
     [Fact]
-    public void Execute_DoesNotAdvertiseSearchYet()
+    public void Execute_MarksCanSearchOnlyForStoresWithAnAvailableSearcher()
     {
-        var useCase = Build([Fetcher(ProductSource.MercadoLivre, true)], []);
+        var useCase = Build([], [], [Searcher(ProductSource.MercadoLivre, true), Searcher(ProductSource.Kabum, false)]);
 
-        useCase.Execute().Should().OnlyContain(s => !s.CanSearch);
+        var stores = useCase.Execute();
+
+        stores.Single(s => s.Source == ProductSource.MercadoLivre).CanSearch.Should().BeTrue();
+        stores.Single(s => s.Source == ProductSource.Kabum).CanSearch.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Execute_WithoutSearchers_NoStoreCanSearch()
+    {
+        Build([Fetcher(ProductSource.MercadoLivre, true)], []).Execute().Should().OnlyContain(s => !s.CanSearch);
     }
 }

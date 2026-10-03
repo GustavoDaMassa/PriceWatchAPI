@@ -16,6 +16,7 @@ public class DeleteAccountUseCase
     private readonly IUserProductSubscriptionRepository _subscriptionRepository;
     private readonly SyncOfferActivityUseCase _syncOfferActivity;
     private readonly IClickLogRepository _clickLogRepository;
+    private readonly IOfferMatchFeedbackRepository _feedbackRepository;
 
     public DeleteAccountUseCase(
         IUserRepository userRepository,
@@ -26,7 +27,8 @@ public class DeleteAccountUseCase
         INotificationRepository notificationRepository,
         IUserProductSubscriptionRepository subscriptionRepository,
         SyncOfferActivityUseCase syncOfferActivity,
-        IClickLogRepository clickLogRepository)
+        IClickLogRepository clickLogRepository,
+        IOfferMatchFeedbackRepository feedbackRepository)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
@@ -37,6 +39,7 @@ public class DeleteAccountUseCase
         _subscriptionRepository = subscriptionRepository;
         _syncOfferActivity = syncOfferActivity;
         _clickLogRepository = clickLogRepository;
+        _feedbackRepository = feedbackRepository;
     }
 
     public async Task ExecuteAsync(string userId, string password)
@@ -69,6 +72,7 @@ public class DeleteAccountUseCase
         await _listRepository.DeleteByUserIdAsync(userId);
         await _notificationRepository.DeleteByUserIdAsync(userId);
         await _clickLogRepository.DeleteByUserIdAsync(userId);
+        await _feedbackRepository.DeleteByUserIdAsync(userId);
         await _userRepository.DeleteAsync(userId);
     }
 }

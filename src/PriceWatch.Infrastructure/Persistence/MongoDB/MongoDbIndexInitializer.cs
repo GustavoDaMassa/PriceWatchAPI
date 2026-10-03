@@ -23,6 +23,7 @@ public class MongoDbIndexInitializer
         await CreateStoreOfferIndexesAsync();
         await CreateUserProductSubscriptionIndexesAsync();
         await CreateClickLogIndexesAsync();
+        await CreateDiscoveryIndexesAsync();
     }
 
     private async Task CreateUserIndexesAsync()
@@ -98,6 +99,43 @@ public class MongoDbIndexInitializer
                 .Ascending(n => n.UserId)
                 .Descending(n => n.CreatedAt),
             new CreateIndexOptions { Name = "idx_notifications_userId_createdAt" }));
+    }
+
+    private async Task CreateDiscoveryIndexesAsync()
+    {
+        var candidates = _database.GetCollection<OfferCandidateDocument>("offer_candidates");
+
+        await candidates.Indexes.CreateOneAsync(new CreateIndexModel<OfferCandidateDocument>(
+            Builders<OfferCandidateDocument>.IndexKeys.Ascending(c => c.ProductId),
+            new CreateIndexOptions { Name = "idx_offer_candidates_productId" }));
+
+        // a mesma oferta (loja + URL) aparece uma vez por produto
+        await candidates.Indexes.CreateOneAsync(new CreateIndexModel<OfferCandidateDocument>(
+            Builders<OfferCandidateDocument>.IndexKeys
+                .Ascending(c => c.ProductId)
+                .Ascending(c => c.Source)
+                .Ascending(c => c.Url),
+            new CreateIndexOptions { Unique = true, Name = "idx_offer_candidates_product_source_url_unique" }));
+
+        // TTL: candidatas expiram sozinhas (ExpireAfter zero = na data de expiresAt)
+        await candidates.Indexes.CreateOneAsync(new CreateIndexModel<OfferCandidateDocument>(
+            Builders<OfferCandidateDocument>.IndexKeys.Ascending(c => c.ExpiresAt),
+            new CreateIndexOptions { ExpireAfter = TimeSpan.Zero, Name = "idx_offer_candidates_expiresAt_ttl" }));
+
+        var feedback = _database.GetCollection<OfferMatchFeedbackDocument>("offer_match_feedback");
+
+        // um veredito por usuário e candidata
+        await feedback.Indexes.CreateOneAsync(new CreateIndexModel<OfferMatchFeedbackDocument>(
+            Builders<OfferMatchFeedbackDocument>.IndexKeys
+                .Ascending(f => f.UserId)
+                .Ascending(f => f.CandidateId),
+            new CreateIndexOptions { Unique = true, Name = "idx_offer_match_feedback_user_candidate_unique" }));
+
+        await feedback.Indexes.CreateOneAsync(new CreateIndexModel<OfferMatchFeedbackDocument>(
+            Builders<OfferMatchFeedbackDocument>.IndexKeys
+                .Ascending(f => f.UserId)
+                .Ascending(f => f.ProductId),
+            new CreateIndexOptions { Name = "idx_offer_match_feedback_user_product" }));
     }
 
     private async Task CreateClickLogIndexesAsync()

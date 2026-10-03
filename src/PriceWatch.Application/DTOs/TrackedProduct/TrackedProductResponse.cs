@@ -13,4 +13,5 @@ public record TrackedProductResponse(
     decimal CurrentPrice,
     decimal LowestPrice,
     bool IsActive,
-    DateTime NextCheckAt);
+    DateTime NextCheckAt,
+    string? ProductId = null);

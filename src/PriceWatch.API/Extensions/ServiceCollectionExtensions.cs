@@ -9,6 +9,7 @@ using Polly.Extensions.Http;
 using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
 using PriceWatch.Application.UseCases.Catalog;
+using PriceWatch.Application.UseCases.Discovery;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
 using PriceWatch.Application.UseCases.Offers;
@@ -24,6 +25,7 @@ using PriceWatch.Infrastructure.Fetchers;
 using PriceWatch.Infrastructure.Messaging;
 using PriceWatch.Infrastructure.Network;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Repositories;
+using PriceWatch.Infrastructure.Search;
 using PriceWatch.Infrastructure.Security;
 using PriceWatch.Infrastructure.Settings;
 using PriceWatch.Infrastructure.Workers;
@@ -126,6 +128,7 @@ public static class ServiceCollectionExtensions
             .AddPolicyHandler(GetRetryPolicy())
             .AddPolicyHandler(GetCircuitBreakerPolicy());
         services.AddSingleton<MercadoLivreTokenService>();
+        services.AddSingleton<IMercadoLivreTokenProvider>(sp => sp.GetRequiredService<MercadoLivreTokenService>());
         services.AddScoped<IPriceFetcher, MercadoLivreFetcher>();
         services.AddScoped<IPriceFetcherResolver, PriceFetcherResolver>();
         services.AddHttpClient<MercadoLivreFetcher>(client =>
@@ -154,9 +157,27 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStoreOfferRepository, StoreOfferRepository>();
         services.AddScoped<IUserProductSubscriptionRepository, UserProductSubscriptionRepository>();
         services.AddScoped<IClickLogRepository, ClickLogRepository>();
+        services.AddScoped<IOfferCandidateRepository, OfferCandidateRepository>();
+        services.AddScoped<IOfferMatchFeedbackRepository, OfferMatchFeedbackRepository>();
         services.AddHostedService<BackfillWorker>();
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
+        services.AddSingleton<IDiscoveryGate, RedisDiscoveryGate>();
         services.AddHostedService<ProductMatchingConsumer>();
+
+        // descoberta de ofertas em outras lojas (M3): cada buscador nunca lança e fica indisponível sem credenciais
+        services.AddHttpClient<KabumOfferSearcher>()
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+        services.AddScoped<IOfferSearcher>(sp => sp.GetRequiredService<KabumOfferSearcher>());
+        services.AddHttpClient("mercadolivre-search")
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+        services.AddScoped<IOfferSearcher>(sp => new MercadoLivreOfferSearcher(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("mercadolivre-search"),
+            sp.GetRequiredService<IMercadoLivreTokenProvider>(),
+            sp.GetRequiredService<IOptions<MercadoLivreSettings>>(),
+            sp.GetRequiredService<MercadoLivreFetcher>(),
+            sp.GetRequiredService<ILogger<MercadoLivreOfferSearcher>>()));
 
         // resolução de links curtos com defesa contra SSRF (só IPs públicos, validado também na conexão)
         services.AddSingleton<IHostAddressResolver, DnsHostAddressResolver>();
@@ -234,6 +255,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ImportFromLinkUseCase>();
         services.AddScoped<CheckOfferPriceUseCase>();
         services.AddScoped<GetSupportedStoresUseCase>();
+        services.AddScoped<DiscoverOffersUseCase>();
+        services.AddScoped<GetOfferCandidatesUseCase>();
+        services.AddScoped<ConfirmOfferMatchUseCase>();
         services.AddScoped<LegacyProductCatalogFacade>();
         services.AddScoped<UnifiedProductCatalogFacade>();
         // escolhido a cada request pela flag (lazy via IOptions): cutover e rollback sem novo deploy

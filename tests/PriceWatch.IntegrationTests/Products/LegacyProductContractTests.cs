@@ -78,6 +78,8 @@ public abstract class LegacyProductContractTests
         product.GetProperty("isActive").GetBoolean().Should().BeTrue();
         product.TryGetProperty("nextCheckAt", out _).Should().BeTrue();
         product.TryGetProperty("listId", out _).Should().BeTrue();
+        // campo aditivo: nulo no modelo legado, preenchido no catálogo unificado (ver UnifiedCutoverTests)
+        product.TryGetProperty("productId", out _).Should().BeTrue();
     }
 
     [Fact]

@@ -89,6 +89,7 @@ public class UnifiedProductCatalogFacadeTests
 
         var item = items.Should().ContainSingle().Subject;
         item.Id.Should().Be(sub.Id);
+        item.ProductId.Should().Be(_product.Id);
         item.ListId.Should().Be("list-1");
         item.Name.Should().Be("Notebook Gamer");
         item.ImageUrl.Should().Be("https://img/n.png");

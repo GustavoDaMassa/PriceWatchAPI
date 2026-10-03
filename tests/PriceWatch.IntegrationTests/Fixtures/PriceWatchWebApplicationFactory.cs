@@ -25,6 +25,7 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
 
     public FakeEmailSender FakeEmail { get; } = new();
     public FakePriceFetcher FakeFetcher { get; } = new();
+    public FakeOfferSearcher FakeSearcher { get; } = new();
 
     private readonly MongoDbContainer _mongo = new MongoDbBuilder()
         .WithImage("mongo:7.0")
@@ -110,6 +111,10 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
             // substitui o fetcher real (chamaria a API do Mercado Livre de verdade) por um fake
             services.RemoveAll<IPriceFetcher>();
             services.AddSingleton<IPriceFetcher>(FakeFetcher);
+
+            // idem para a descoberta em outras lojas: nada de chamar Mercado Livre/Lomadee de verdade
+            services.RemoveAll<IOfferSearcher>();
+            services.AddSingleton<IOfferSearcher>(FakeSearcher);
         });
     }
 }

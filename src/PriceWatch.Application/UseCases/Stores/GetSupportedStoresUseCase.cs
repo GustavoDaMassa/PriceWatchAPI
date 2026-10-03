@@ -8,13 +8,16 @@ public class GetSupportedStoresUseCase
 {
     private readonly IEnumerable<IPriceFetcher> _fetchers;
     private readonly IEnumerable<IAffiliateLinkGenerator> _affiliateGenerators;
+    private readonly IEnumerable<IOfferSearcher> _searchers;
 
     public GetSupportedStoresUseCase(
         IEnumerable<IPriceFetcher> fetchers,
-        IEnumerable<IAffiliateLinkGenerator> affiliateGenerators)
+        IEnumerable<IAffiliateLinkGenerator> affiliateGenerators,
+        IEnumerable<IOfferSearcher> searchers)
     {
         _fetchers = fetchers;
         _affiliateGenerators = affiliateGenerators;
+        _searchers = searchers;
     }
 
     public IReadOnlyList<StoreCapabilitiesResponse> Execute() =>
@@ -24,7 +27,7 @@ public class GetSupportedStoresUseCase
                 store.Name,
                 store.HomeUrl,
                 CanFetchByUrl: _fetchers.Any(f => f.ProductSource == store.Source && f.IsAvailable),
-                CanSearch: false, // a descoberta por GTIN/palavra-chave chega no M3
+                CanSearch: _searchers.Any(s => s.ProductSource == store.Source && s.IsAvailable),
                 CanGenerateAffiliateLink: _affiliateGenerators.Any(g => g.ProductSource == store.Source && g.IsAvailable)))
             .ToList();
 }
