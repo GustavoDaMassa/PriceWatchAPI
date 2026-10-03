@@ -8,6 +8,7 @@ public interface ITrackedProductRepository
     Task<TrackedProduct?> GetByIdAsync(string id);
     Task<TrackedProduct?> GetByUserIdAndUrlAsync(string userId, string url);
     Task<IEnumerable<TrackedProduct>> GetDueForCheckAsync();
+    Task<IEnumerable<TrackedProduct>> GetAllAsync();
     Task CreateAsync(TrackedProduct product);
     Task UpdateAsync(TrackedProduct product);
     Task DeleteAsync(string id);

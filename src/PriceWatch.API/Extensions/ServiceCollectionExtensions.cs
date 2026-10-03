@@ -148,6 +148,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IStoreOfferRepository, StoreOfferRepository>();
         services.AddScoped<IUserProductSubscriptionRepository, UserProductSubscriptionRepository>();
+        services.AddHostedService<BackfillWorker>();
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
         services.AddHostedService<ProductMatchingConsumer>();
 
@@ -196,6 +197,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<CreateOfferUseCase>();
         services.AddScoped<GetProductComparisonUseCase>();
         services.AddScoped<RedirectOfferUseCase>();
+        services.AddScoped<BackfillTrackedProductsUseCase>();
         services.AddScoped<MatchStoreOfferUseCase>();
 
         return services;

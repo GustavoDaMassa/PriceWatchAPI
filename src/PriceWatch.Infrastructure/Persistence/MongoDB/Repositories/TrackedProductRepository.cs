@@ -50,6 +50,12 @@ public class TrackedProductRepository : ITrackedProductRepository
         return docs.Select(TrackedProductMappings.ToDomain);
     }
 
+    public async Task<IEnumerable<TrackedProduct>> GetAllAsync()
+    {
+        var docs = await _collection.Find(FilterDefinition<TrackedProductDocument>.Empty).ToListAsync();
+        return docs.Select(TrackedProductMappings.ToDomain);
+    }
+
     public async Task CreateAsync(TrackedProduct product)
     {
         await _collection.InsertOneAsync(TrackedProductMappings.ToDocument(product));
