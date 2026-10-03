@@ -110,4 +110,22 @@ public class TrackedProductTests
 
         product.IsActive.Should().BeFalse();
     }
+
+    [Fact]
+    public void IsMigratedToProduct_BeforeMarking_ReturnsFalse()
+    {
+        var product = CreateProduct();
+
+        product.IsMigratedToProduct().Should().BeFalse();
+    }
+
+    [Fact]
+    public void MarkMigratedToProduct_ShouldMakeIsMigratedToProductReturnTrue()
+    {
+        var product = CreateProduct();
+
+        product.MarkMigratedToProduct("product-1");
+
+        product.IsMigratedToProduct().Should().BeTrue();
+    }
 }

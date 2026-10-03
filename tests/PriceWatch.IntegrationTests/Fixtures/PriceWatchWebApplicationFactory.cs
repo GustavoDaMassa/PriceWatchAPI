@@ -24,6 +24,7 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
     private const string TestJwtAudience = "PriceWatchUsers";
 
     public FakeEmailSender FakeEmail { get; } = new();
+    public FakePriceFetcher FakeFetcher { get; } = new();
 
     private readonly MongoDbContainer _mongo = new MongoDbBuilder()
         .WithImage("mongo:7.0")
@@ -55,17 +56,23 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
             {
                 ["MongoDb:ConnectionString"] = _mongo.GetConnectionString(),
                 ["MongoDb:DatabaseName"] = "pricewatch_test",
-                ["Redis:ConnectionString"] = _redis.GetConnectionString()
+                ["Redis:ConnectionString"] = _redis.GetConnectionString(),
+                // limite alto o suficiente pra não interferir na suíte — rate limiting em si
+                // é coberto por um teste dedicado, não pela suíte de fluxo geral
+                ["RateLimiting:AnonymousPermitLimit"] = "10000",
+                ["RateLimiting:AuthenticatedPermitLimit"] = "10000"
             });
         });
 
         builder.ConfigureTestServices(services =>
         {
-            // remove workers — evita loop de check e consumer durante os testes
+            // remove workers — evita loop de check e consumer durante os testes; o matching
+            // é exercitado chamando MatchStoreOfferUseCase direto, não via consumer assíncrono
             var workers = services
                 .Where(d => d.ServiceType == typeof(IHostedService) &&
                            (d.ImplementationType == typeof(PriceCheckWorker) ||
-                            d.ImplementationType == typeof(RedisStreamConsumer)))
+                            d.ImplementationType == typeof(RedisStreamConsumer) ||
+                            d.ImplementationType == typeof(ProductMatchingConsumer)))
                 .ToList();
             foreach (var w in workers)
                 services.Remove(w);
@@ -98,6 +105,10 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
             // substitui email real pelo fake
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(FakeEmail);
+
+            // substitui o fetcher real (chamaria a API do Mercado Livre de verdade) por um fake
+            services.RemoveAll<IPriceFetcher>();
+            services.AddSingleton<IPriceFetcher>(FakeFetcher);
         });
     }
 }

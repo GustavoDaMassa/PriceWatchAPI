@@ -124,4 +124,12 @@ public class TrackedProduct
     public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;
     public void SetTargetPrice(decimal targetPrice) => TargetPrice = targetPrice;
+
+    // marca de idempotência do backfill pro pivô multi-loja (ver docs/arquitetura.md) —
+    // evita recriar Product/StoreOffer a cada execução do BackfillWorker
+    private const string MigratedProductIdMetadataKey = "migratedProductId";
+
+    public void MarkMigratedToProduct(string productId) => Metadata[MigratedProductIdMetadataKey] = productId;
+
+    public bool IsMigratedToProduct() => Metadata.ContainsKey(MigratedProductIdMetadataKey);
 }

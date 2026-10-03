@@ -58,9 +58,15 @@ public partial class MercadoLivreFetcher : IPriceFetcher
             throw new BusinessException($"Could not read a valid price for catalog product '{catalogId}'.");
 
         var imageUrl = product.Pictures?.FirstOrDefault()?.Url;
+        var gtin = FindAttribute(product.Attributes, "GTIN");
+        var brand = FindAttribute(product.Attributes, "BRAND");
+        var model = FindAttribute(product.Attributes, "MODEL");
 
-        return new ProductFetchResult(minPrice, product.Name ?? catalogId, imageUrl);
+        return new ProductFetchResult(minPrice, product.Name ?? catalogId, imageUrl, gtin, brand, model);
     }
+
+    private static string? FindAttribute(List<MercadoLivreAttribute>? attributes, string id) =>
+        attributes?.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase))?.ValueName;
 
     private async Task<T> GetAsync<T>(string url, string token)
     {
@@ -87,10 +93,15 @@ public partial class MercadoLivreFetcher : IPriceFetcher
 
     private record MercadoLivreProduct(
         [property: JsonPropertyName("name")] string? Name,
-        [property: JsonPropertyName("pictures")] List<MercadoLivrePicture>? Pictures);
+        [property: JsonPropertyName("pictures")] List<MercadoLivrePicture>? Pictures,
+        [property: JsonPropertyName("attributes")] List<MercadoLivreAttribute>? Attributes);
 
     private record MercadoLivrePicture(
         [property: JsonPropertyName("url")] string? Url);
+
+    private record MercadoLivreAttribute(
+        [property: JsonPropertyName("id")] string? Id,
+        [property: JsonPropertyName("value_name")] string? ValueName);
 
     private record MercadoLivreItemsResult(
         [property: JsonPropertyName("results")] List<MercadoLivreItemEntry>? Results);

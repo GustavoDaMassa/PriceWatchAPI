@@ -112,6 +112,77 @@
 
 ---
 
+### `products` (catálogo compartilhado — pivô multi-loja, implementado)
+
+| Campo | Tipo | Obrigatório | Observação |
+|---|---|---|---|
+| `_id` | string (GUID) | sim | |
+| `gtin` | string? | não | chave de match EAN-first |
+| `name` | string | sim | |
+| `brand` | string? | não | |
+| `model` | string? | não | |
+| `imageUrl` | string? | não | |
+| `matchStatus` | int (enum) | sim | `MatchStatus`: Unmatched, AutoMatched, PendingReview, Confirmed, Rejected |
+| `suggestedMatchProductId` | string? | não | preenchido só no fuzzy match (`PendingReview`) |
+| `createdAt` | DateTime | sim | UTC |
+
+**Índices:** `idx_products_gtin` (`gtin asc`, não único).
+
+---
+
+### `store_offers` (implementado)
+
+| Campo | Tipo | Obrigatório | Observação |
+|---|---|---|---|
+| `_id` | string (GUID) | sim | |
+| `productId` | string | sim | ref → `products._id` |
+| `source` | int (enum) | sim | `ProductSource`: 0=MercadoLivre, 1=Kabum, 2=Manual (só cresce no final, RNF14) |
+| `url` | string | sim | |
+| `gtin` | string? | não | |
+| `currentPrice` / `lowestPrice` | decimal | sim | atualizados por `RecordPrice()` |
+| `affiliateUrl` | string? | não | cache do link de afiliado |
+| `checkIntervalHours` | int | sim | padrão 1; pode ser aumentado por oferta |
+| `nextCheckAt` | DateTime | sim | UTC |
+| `lastCheckedAt` | DateTime? | não | UTC |
+| `isActive` | bool | sim | |
+| `createdAt` | DateTime | sim | UTC |
+
+**Índices:** `idx_store_offers_productId` (`productId asc`), `idx_store_offers_check_queue` (`isActive asc, nextCheckAt asc`), `idx_store_offers_source_url_unique` (`source asc, url asc`, único).
+
+---
+
+### `user_product_subscriptions` (implementado)
+
+| Campo | Tipo | Obrigatório | Observação |
+|---|---|---|---|
+| `_id` | string (GUID) | sim | |
+| `userId` | string | sim | ref → `users._id` |
+| `productId` | string | sim | ref → `products._id` |
+| `listId` | string? | não | ref → `product_lists._id` |
+| `targetPrice` | decimal | sim | |
+| `isActive` | bool | sim | |
+| `targetAlertSent` | bool | sim | evita alerta repetido por queda |
+| `createdAt` | DateTime | sim | UTC |
+
+**Índices:** `idx_subscriptions_userId_productId_unique` (`userId asc, productId asc`, único), `idx_subscriptions_listId` (`listId asc`).
+
+> Nota sobre `price_snapshots`: no código atual `StoreOffer.RecordPrice()` cria o snapshot com o id da **oferta** no campo `productId` (`PriceSnapshot.Create(Id, price)`), e `TrackedProduct` faz o mesmo com o id do produto legado. O campo mantém o nome `productId` nas duas situações, e o índice continua `productId asc, capturedAt desc`.
+
+---
+
+## Coleções planejadas para a v1 (ainda **não** implementadas)
+
+Descritas em `arquitetura.md` ("Arquitetura da v1") e `modelagem.md`. Este documento só passará a tratá-las como implementadas quando o código existir.
+
+| Coleção | Campos principais | Índices previstos |
+|---|---|---|
+| `offer_candidates` | `productId`, `source`, `url`, snapshot do fetch (nome, preço, GTIN, marca, modelo, imagem), `score`, `reason` (`Gtin`/`Keyword`), `expiresAt` | `productId`; TTL em `expiresAt`; único `productId+source+url` |
+| `offer_match_feedback` | `userId`, `candidateId`, `productId`, `url`, `verdict`, `track`, `createdAt` | único `userId+candidateId` |
+| `click_logs` | `offerId`, `userId`, `createdAt` | `offerId+createdAt` |
+| `device_tokens` | `userId`, `token`, `platform`, `createdAt` | `userId`; único `token` |
+
+---
+
 ## Integridade referencial
 
 MongoDB não tem foreign keys. As regras são garantidas pela camada de Application:

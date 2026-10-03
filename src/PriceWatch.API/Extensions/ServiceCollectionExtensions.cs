@@ -1,17 +1,22 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
+using Polly;
+using Polly.Extensions.Http;
 using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
+using PriceWatch.Application.UseCases.Offers;
 using PriceWatch.Application.UseCases.ProductList;
 using PriceWatch.Application.UseCases.TrackedProduct;
 using PriceWatch.Application.UseCases.Users;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
+using PriceWatch.Infrastructure.Affiliates;
 using PriceWatch.Infrastructure.Email;
 using PriceWatch.Infrastructure.Fetchers;
 using PriceWatch.Infrastructure.Messaging;
@@ -68,8 +73,14 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
 
-        var jwtSettings = configuration.GetSection("Jwt").Get<JwtSettings>()!;
-        var key = Encoding.UTF8.GetBytes(jwtSettings.Secret ?? "default-dev-secret-change-in-production");
+        var jwtSettings = configuration.GetSection("Jwt").Get<JwtSettings>()
+            ?? throw new InvalidOperationException("Missing 'Jwt' configuration section.");
+
+        if (string.IsNullOrWhiteSpace(jwtSettings.Secret))
+            throw new InvalidOperationException(
+                "Jwt:Secret must be set via configuration/environment variable — no default is allowed.");
+
+        var key = Encoding.UTF8.GetBytes(jwtSettings.Secret);
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -108,14 +119,18 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITrackedProductRepository, TrackedProductRepository>();
         services.AddScoped<IPriceSnapshotRepository, PriceSnapshotRepository>();
         services.Configure<MercadoLivreSettings>(configuration.GetSection("MercadoLivre"));
-        services.AddHttpClient<MercadoLivreTokenService>();
+        services.AddHttpClient<MercadoLivreTokenService>()
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
         services.AddSingleton<MercadoLivreTokenService>();
         services.AddScoped<IPriceFetcher, MercadoLivreFetcher>();
         services.AddScoped<IPriceFetcherResolver, PriceFetcherResolver>();
         services.AddHttpClient<MercadoLivreFetcher>(client =>
         {
             client.DefaultRequestHeaders.Add("User-Agent", "PriceWatchAPI/1.0");
-        });
+        })
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
         services.AddHostedService<PriceCheckWorker>();
 
         // Notification
@@ -128,6 +143,29 @@ public static class ServiceCollectionExtensions
         });
         services.AddScoped<IAlertPublisher, RedisStreamPublisher>();
         services.AddHostedService<RedisStreamConsumer>();
+
+        // Pivô multi-loja: Product / StoreOffer / UserProductSubscription
+        services.Configure<FeatureFlags>(configuration.GetSection("Features"));
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IStoreOfferRepository, StoreOfferRepository>();
+        services.AddScoped<IUserProductSubscriptionRepository, UserProductSubscriptionRepository>();
+        services.AddHostedService<BackfillWorker>();
+        services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
+        services.AddHostedService<ProductMatchingConsumer>();
+
+        // Lomadee/SocialSoul — agregador de afiliados escolhido na Fase 6 (cobre Kabum, ver docs/arquitetura.md)
+        services.Configure<LomadeeSettings>(configuration.GetSection("Lomadee"));
+        services.AddScoped<IPriceFetcher, KabumFetcher>();
+        services.AddHttpClient<KabumFetcher>()
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+        // Passthrough sempre por último — CanHandle universal funciona como fallback do resolver
+        services.AddScoped<IAffiliateLinkGenerator, LomadeeDeeplinkGenerator>();
+        services.AddHttpClient<LomadeeDeeplinkGenerator>()
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+        services.AddScoped<IAffiliateLinkGenerator, PassthroughAffiliateLinkGenerator>();
+        services.AddScoped<IAffiliateLinkResolver, AffiliateLinkResolver>();
 
         return services;
     }
@@ -166,6 +204,23 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ChangeEmailUseCase>();
         services.AddScoped<DeleteAccountUseCase>();
 
+        // Offers (pivô multi-loja)
+        services.AddScoped<CreateOfferUseCase>();
+        services.AddScoped<GetProductComparisonUseCase>();
+        services.AddScoped<RedirectOfferUseCase>();
+        services.AddScoped<BackfillTrackedProductsUseCase>();
+        services.AddScoped<MatchStoreOfferUseCase>();
+
         return services;
     }
+
+    private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
+        HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+    private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
+        HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
 }
