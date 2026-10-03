@@ -65,3 +65,15 @@
 - Erro: Swagger UI continua exibindo rotas antigas após atualizar os controllers e reiniciar a API via `start-dev.sh`
 - Causa: `start-dev.sh` usava `dotnet run` com build incremental, que reutilizava artefatos em cache e não regenerava o XML de documentação do Swagger
 - Correção: separado em `dotnet build --no-restore -q` seguido de `dotnet run --no-build`, garantindo rebuild explícito antes de subir — commit `4f93e66`
+
+---
+
+**2026-09-22 · Fase 3 do pivô (rate limiting) · Rate limiter quebrou testes de integração existentes ao ler configuração cedo demais**
+- Erro: `AuthFlowTests` (já existentes, sem mudança própria) passaram a retornar 429 em vez do status esperado
+- Causa: o limite era lido com `builder.Configuration.GetValue(...)` numa `var` antes de `builder.Build()`; `WebApplicationFactory.ConfigureAppConfiguration()` só mescla os overrides de teste no momento em que `Build()` é interceptado — depois que essa leitura antecipada já tinha capturado o valor padrão do `appsettings.json` (30), não o override de teste. Toda a suíte, compartilhando o mesmo bucket de IP, estourava o limite real
+- Correção: trocado por `services.Configure<RateLimitingSettings>(...)` + `AddOptions<RateLimiterOptions>().Configure<IOptions<RateLimitingSettings>>(...)`, que resolve o valor de forma lazy (só no primeiro uso, já depois do `Build()`) — mesmo padrão já usado pra `JwtSettings`/`MongoDbSettings`
+
+**2026-09-22 · Fase 5 do pivô (motor de matching) · GTIN fixo no FakePriceFetcher causou colisão entre testes de integração**
+- Erro: teste de matching (`MatchingFlowTests`) fundiu a oferta criada nele com um produto de OUTRO teste da suíte, não com o produto esperado dentro do próprio teste
+- Causa: todos os testes de integração compartilham a mesma instância de `PriceWatchWebApplicationFactory` (1 Mongo, 1 Redis) pro ciclo de vida da collection inteira, sem reset entre testes; `FakePriceFetcher` devolvia sempre o mesmo GTIN constante, então produtos criados em testes diferentes acabavam compartilhando GTIN sem intenção, e o motor de matching (correto) casava eles
+- Correção: `FakePriceFetcher` passou a derivar um GTIN único por URL por padrão (hash da URL), com um método `SetSharedGtin(url, gtin)` explícito pra quando um teste precisa simular de propósito duas ofertas do mesmo produto físico
