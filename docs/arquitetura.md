@@ -527,10 +527,20 @@ O merge na `main` publica em produção (Watchtower), então todo comportamento 
 |---|---|---|
 | `Features__BackfillEnabled` (`FEATURE_BACKFILL_ENABLED`) | `false` | Liga o `BackfillWorker` (migra `TrackedProduct` legado para `Product`/`StoreOffer`/`UserProductSubscription`) |
 | `Features__MatchingEnabled` (`FEATURE_MATCHING_ENABLED`) | `false` | Liga o `ProductMatchingConsumer` (matching assíncrono) |
+| `Features__UnifiedCatalogEnabled` (`FEATURE_UNIFIED_CATALOG_ENABLED`) | `false` | **Cutover (M1):** os endpoints legados passam a ser servidos pelo catálogo unificado, o `StoreOfferPriceCheckWorker` assume o monitoramento e o `PriceCheckWorker` legado fica ocioso. Implica backfill e matching ativos (`FeatureFlags.BackfillActive`/`MatchingActive`). Procedimento e rollback em `runbook-cutover.md` |
 
-Os workers continuam registrados e checam a flag em runtime (a configuração é lida via `IOptions`, de forma lazy, compatível com os overrides dos testes de integração). Flags planejadas: `OfferMonitoringEnabled` e `LegacyMonitoringEnabled` (M1).
+Os workers continuam registrados e checam a flag em runtime (a configuração é lida via `IOptions`, de forma lazy, compatível com os overrides dos testes de integração). Em vez de duas flags separadas para o monitoramento, uma só (`UnifiedCatalogEnabled`) garante que o worker novo e o legado nunca rodem juntos.
 
 **Integração Lomadee/Kabum:** sem `Lomadee__AppToken` e `Lomadee__SourceId`, `LomadeeSettings.IsConfigured` é `false`; `KabumFetcher.CanHandle` e `LomadeeDeeplinkGenerator.CanHandle` retornam `false`. Uma URL da Kabum cai em "nenhum fetcher encontrado" (400) e o redirect usa o passthrough, sem falha em runtime.
+
+## Monitoramento unificado e camada de compatibilidade (M1)
+
+- **`StoreOfferPriceCheckWorker`** verifica as `StoreOffer` vencidas (`GetDueForCheckAsync`) e chama `CheckOfferPriceUseCase` **uma vez por oferta**, qualquer que seja o número de assinantes. Grava o `PriceSnapshot` (chaveado pelo id da oferta) e avalia cada `UserProductSubscription` ativa: alerta de preço-alvo (uma vez, rearmado quando o preço volta a subir) ou novo menor preço. Com várias lojas para o mesmo produto, o alvo é comparado ao **melhor preço entre as lojas**, e o "novo menor preço" ao menor histórico entre todas elas. Se a loja falha, `PostponeCheck` (15 min) evita bater na API externa a cada ciclo.
+- **`SyncOfferActivityUseCase`:** uma oferta só é monitorada se existir ao menos uma assinatura ativa; chamado ao criar, reativar, pausar ou remover assinaturas e ao excluir conta.
+- **`IProductCatalogFacade`** (`Application/UseCases/Catalog/`): contrato dos endpoints legados (`/api/products`, análise de lista) com os **mesmos DTOs**. `LegacyProductCatalogFacade` delega aos casos de uso existentes; `UnifiedProductCatalogFacade` usa o catálogo novo. A escolha é feita **a cada request** por `Features:UnifiedCatalogEnabled` (resolução lazy via `IOptions`). O "item" legado é a assinatura do usuário; preço, URL e loja vêm da melhor oferta ativa (a mais barata); `lowestPrice` é o menor entre as lojas; o histórico exibido é o da oferta principal.
+- **Backfill que preserva ids:** assinatura = id do `TrackedProduct`; a primeira oferta criada para uma URL também usa esse id (o histórico em `price_snapshots` continua válido). Itens do mesmo URL de outros usuários reaproveitam a oferta compartilhada e o histórico do item **mais antigo**. O menor preço histórico e o estado "alerta de alvo já enviado" também são preservados (ninguém é alertado de novo logo após o cutover).
+- **Contrato de regressão:** `tests/PriceWatch.IntegrationTests/Products/LegacyProductContractTests.cs` roda os mesmos 18 cenários contra os dois modos (legado e unificado), e `UnifiedCutoverTests.cs` simula o cutover com dados semeados (ids, preços, histórico, idempotência, usuários com a mesma URL).
+- **Limites conhecidos:** itens criados no modo unificado não existem no `TrackedProduct`; um rollback para o legado os esconde até o cutover novo. Um mesmo usuário que acompanhe dois itens legados que o matching depois unifique no mesmo produto passa a ter uma única assinatura.
 
 ## Decisões Técnicas — v1
 
