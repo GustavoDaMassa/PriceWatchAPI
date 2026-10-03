@@ -1,5 +1,6 @@
 using MongoDB.Driver;
 using PriceWatch.Domain.Entities;
+using PriceWatch.Domain.Enums;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Documents;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Mappings;
@@ -27,6 +28,13 @@ public class OfferMatchFeedbackRepository : IOfferMatchFeedbackRepository
     {
         var docs = await _collection.Find(d => d.UserId == userId && d.ProductId == productId).ToListAsync();
         return docs.Select(OfferMatchFeedbackMappings.ToDomain);
+    }
+
+    public async Task<int> CountTrackVotesAsync(string candidateId)
+    {
+        var count = await _collection.CountDocumentsAsync(
+            d => d.CandidateId == candidateId && d.Verdict == MatchVerdict.Same && d.Track);
+        return (int)count;
     }
 
     public async Task SaveAsync(OfferMatchFeedback feedback)

@@ -50,7 +50,7 @@ public class CreateOfferUseCase : ICreateOfferUseCase
             product = await _products.GetByIdAsync(offer.ProductId)
                 ?? throw new ProductNotFoundException(offer.ProductId);
 
-            if (await TrySetAffiliateUrlAsync(offer))
+            if (await OfferAffiliateLinker.TrySetAsync(_affiliateResolver, offer))
                 await _offers.UpdateAsync(offer);
         }
         else
@@ -63,7 +63,7 @@ public class CreateOfferUseCase : ICreateOfferUseCase
 
             offer = StoreOffer.Create(product.Id, fetcher.ProductSource, request.Url, fetchResult.Gtin);
             offer.RecordPrice(fetchResult.Price);
-            await TrySetAffiliateUrlAsync(offer);
+            await OfferAffiliateLinker.TrySetAsync(_affiliateResolver, offer);
             await _offers.CreateAsync(offer);
 
             // dispara o motor de matching assíncrono (Fase 5) — não bloqueia esta resposta
@@ -94,26 +94,6 @@ public class CreateOfferUseCase : ICreateOfferUseCase
         await _syncActivity.ExecuteAsync(product.Id);
 
         return ToResponse(subscription, product, offer);
-    }
-
-    // o link de afiliado é gerado ao começar o acompanhamento e guardado na oferta. Só é salvo se uma
-    // rede está disponível E devolveu um link diferente da URL original (as redes devolvem a própria URL
-    // quando falham — cachear isso esconderia a falha para sempre); sem link, o redirect tenta de novo.
-    private async Task<bool> TrySetAffiliateUrlAsync(StoreOffer offer)
-    {
-        if (!string.IsNullOrEmpty(offer.AffiliateUrl))
-            return false;
-
-        var generator = _affiliateResolver.Resolve(offer.Source);
-        if (!generator.IsAvailable)
-            return false;
-
-        var affiliateUrl = await generator.GenerateAsync(offer.Url);
-        if (string.IsNullOrWhiteSpace(affiliateUrl) || string.Equals(affiliateUrl, offer.Url, StringComparison.Ordinal))
-            return false;
-
-        offer.SetAffiliateUrl(affiliateUrl);
-        return true;
     }
 
     // dados do cliente só completam marca/modelo; preço, nome, GTIN e imagem vêm sempre da fonte oficial
