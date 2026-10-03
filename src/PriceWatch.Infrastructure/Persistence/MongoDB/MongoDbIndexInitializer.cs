@@ -19,6 +19,9 @@ public class MongoDbIndexInitializer
         await CreateTrackedProductIndexesAsync();
         await CreatePriceSnapshotIndexesAsync();
         await CreateNotificationIndexesAsync();
+        await CreateProductIndexesAsync();
+        await CreateStoreOfferIndexesAsync();
+        await CreateUserProductSubscriptionIndexesAsync();
     }
 
     private async Task CreateUserIndexesAsync()
@@ -94,5 +97,54 @@ public class MongoDbIndexInitializer
                 .Ascending(n => n.UserId)
                 .Descending(n => n.CreatedAt),
             new CreateIndexOptions { Name = "idx_notifications_userId_createdAt" }));
+    }
+
+    private async Task CreateProductIndexesAsync()
+    {
+        var col = _database.GetCollection<ProductDocument>("products");
+
+        // não-único: Product sem GTIN (PendingReview/Unmatched) tem gtin = null
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<ProductDocument>(
+            Builders<ProductDocument>.IndexKeys.Ascending(p => p.Gtin),
+            new CreateIndexOptions { Name = "idx_products_gtin" }));
+    }
+
+    private async Task CreateStoreOfferIndexesAsync()
+    {
+        var col = _database.GetCollection<StoreOfferDocument>("store_offers");
+
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<StoreOfferDocument>(
+            Builders<StoreOfferDocument>.IndexKeys.Ascending(o => o.ProductId),
+            new CreateIndexOptions { Name = "idx_store_offers_productId" }));
+
+        // query crítica do worker de verificação de preço (substitui o índice equivalente
+        // de tracked_products conforme os offers vão assumindo esse papel)
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<StoreOfferDocument>(
+            Builders<StoreOfferDocument>.IndexKeys
+                .Ascending(o => o.IsActive)
+                .Ascending(o => o.NextCheckAt),
+            new CreateIndexOptions { Name = "idx_store_offers_check_queue" }));
+
+        // dedup: evita criar duas ofertas pra mesma URL na mesma loja
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<StoreOfferDocument>(
+            Builders<StoreOfferDocument>.IndexKeys
+                .Ascending(o => o.Source)
+                .Ascending(o => o.Url),
+            new CreateIndexOptions { Unique = true, Name = "idx_store_offers_source_url_unique" }));
+    }
+
+    private async Task CreateUserProductSubscriptionIndexesAsync()
+    {
+        var col = _database.GetCollection<UserProductSubscriptionDocument>("user_product_subscriptions");
+
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<UserProductSubscriptionDocument>(
+            Builders<UserProductSubscriptionDocument>.IndexKeys
+                .Ascending(s => s.UserId)
+                .Ascending(s => s.ProductId),
+            new CreateIndexOptions { Unique = true, Name = "idx_subscriptions_userId_productId_unique" }));
+
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<UserProductSubscriptionDocument>(
+            Builders<UserProductSubscriptionDocument>.IndexKeys.Ascending(s => s.ListId),
+            new CreateIndexOptions { Name = "idx_subscriptions_listId" }));
     }
 }
