@@ -71,8 +71,14 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
 
-        var jwtSettings = configuration.GetSection("Jwt").Get<JwtSettings>()!;
-        var key = Encoding.UTF8.GetBytes(jwtSettings.Secret ?? "default-dev-secret-change-in-production");
+        var jwtSettings = configuration.GetSection("Jwt").Get<JwtSettings>()
+            ?? throw new InvalidOperationException("Missing 'Jwt' configuration section.");
+
+        if (string.IsNullOrWhiteSpace(jwtSettings.Secret))
+            throw new InvalidOperationException(
+                "Jwt:Secret must be set via configuration/environment variable — no default is allowed.");
+
+        var key = Encoding.UTF8.GetBytes(jwtSettings.Secret);
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
