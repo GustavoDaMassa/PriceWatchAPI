@@ -12,11 +12,12 @@ public class DeleteListUseCaseTests
 {
     private readonly Mock<IProductListRepository> _listRepo = new();
     private readonly Mock<ITrackedProductRepository> _productRepo = new();
+    private readonly Mock<IUserProductSubscriptionRepository> _subscriptionRepo = new();
     private readonly DeleteListUseCase _useCase;
 
     public DeleteListUseCaseTests()
     {
-        _useCase = new DeleteListUseCase(_listRepo.Object, _productRepo.Object);
+        _useCase = new DeleteListUseCase(_listRepo.Object, _productRepo.Object, _subscriptionRepo.Object);
     }
 
     [Fact]
@@ -28,6 +29,7 @@ public class DeleteListUseCaseTests
         await _useCase.ExecuteAsync(list.Id, "user-1");
 
         _productRepo.Verify(r => r.UnlinkByListIdAsync(list.Id), Times.Once);
+        _subscriptionRepo.Verify(r => r.UnlinkByListIdAsync(list.Id), Times.Once);
         _listRepo.Verify(r => r.DeleteAsync(list.Id), Times.Once);
     }
 
@@ -40,5 +42,6 @@ public class DeleteListUseCaseTests
         var act = async () => await _useCase.ExecuteAsync(list.Id, "user-1");
 
         await act.Should().ThrowAsync<ProductListNotFoundException>();
+        _subscriptionRepo.Verify(r => r.UnlinkByListIdAsync(It.IsAny<string>()), Times.Never);
     }
 }
