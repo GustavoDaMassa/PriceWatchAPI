@@ -1,4 +1,5 @@
 using PriceWatch.Application.DTOs.Offer;
+using PriceWatch.Domain.Services;
 using PriceWatch.Domain.Exceptions;
 using PriceWatch.Domain.Interfaces.Repositories;
 
@@ -28,9 +29,14 @@ public class GetProductComparisonUseCase
         var cheapestPrice = offers.Count > 0 ? offers.Min(o => o.CurrentPrice) : (decimal?)null;
 
         var summaries = offers
-            .Select(o => new StoreOfferSummary(o.Id, o.Source, o.CurrentPrice, o.CurrentPrice == cheapestPrice))
+            .Select(o => new StoreOfferSummary(
+                o.Id, o.Source, o.CurrentPrice, o.CurrentPrice == cheapestPrice,
+                StoreName(o.Source), o.LowestPrice, o.LastCheckedAt))
             .ToList();
 
         return new ProductComparisonResponse(product.Id, product.Name, product.ImageUrl, summaries);
     }
+
+    private static string StoreName(Domain.Enums.ProductSource source) =>
+        StoreCatalog.All.FirstOrDefault(s => s.Source == source)?.Name ?? source.ToString();
 }

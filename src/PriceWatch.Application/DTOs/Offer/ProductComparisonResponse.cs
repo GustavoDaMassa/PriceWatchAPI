@@ -12,4 +12,7 @@ public record StoreOfferSummary(
     string OfferId,
     ProductSource Source,
     decimal CurrentPrice,
-    bool IsCheapest);
+    bool IsCheapest,
+    string StoreName = "",
+    decimal LowestPrice = 0m,
+    DateTime? LastCheckedAt = null);
