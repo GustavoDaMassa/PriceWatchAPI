@@ -54,4 +54,12 @@ public class LegacyProductCatalogFacade : IProductCatalogFacade
 
     public Task<IEnumerable<AnalysisItemDto>> GetListAnalysisAsync(string listId, string userId) =>
         _getListAnalysis.ExecuteAsync(listId, userId);
+
+    // modelo legado: não há ofertas nem rede de afiliados, então a saída é a própria URL do item
+    public async Task<string> OpenProductAsync(string productId, string userId)
+    {
+        var items = await _getProducts.ExecuteAsync(userId);
+        return items.FirstOrDefault(i => i.Id == productId)?.Url
+            ?? throw new Domain.Exceptions.TrackedProductNotFoundException(productId);
+    }
 }
