@@ -1,11 +1,10 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using PriceWatch.Domain.Enums;
 using PriceWatch.Domain.Exceptions;
 using PriceWatch.Domain.Interfaces.Services;
 using PriceWatch.Domain.ValueObjects;
+using PriceWatch.Infrastructure.Affiliates;
 using PriceWatch.Infrastructure.Settings;
 
 namespace PriceWatch.Infrastructure.Fetchers;
@@ -49,21 +48,7 @@ public partial class KabumFetcher : IPriceFetcher
         if (string.IsNullOrWhiteSpace(keyword))
             throw new BusinessException("Invalid Kabum URL: could not extract a search keyword from the product slug.");
 
-        var requestUri =
-            $"{_settings.BaseUrl}/{_settings.AppToken}/offer/_search" +
-            $"?sourceId={Uri.EscapeDataString(_settings.SourceId ?? string.Empty)}" +
-            $"&keyword={Uri.EscapeDataString(keyword)}" +
-            "&format=json";
-
-        var response = await _httpClient.GetAsync(requestUri);
-        if (!response.IsSuccessStatusCode)
-            throw new BusinessException($"Lomadee API returned {(int)response.StatusCode} for Kabum search '{keyword}'.");
-
-        await using var stream = await response.Content.ReadAsStreamAsync();
-        var result = await JsonSerializer.DeserializeAsync<LomadeeOfferSearchResult>(stream)
-            ?? throw new BusinessException("Failed to parse Lomadee API response.");
-
-        var offers = (result.Offers ?? [])
+        var offers = (await LomadeeOffersApi.SearchAsync(_httpClient, _settings, keyword))
             .Where(o => o.Link is not null && o.Link.Contains("kabum.com.br", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
@@ -99,17 +84,4 @@ public partial class KabumFetcher : IPriceFetcher
 
     [GeneratedRegex(@"^\d+$")]
     private static partial Regex NumericSegmentRegex();
-
-    private record LomadeeOfferSearchResult(
-        [property: JsonPropertyName("offers")] List<LomadeeOffer>? Offers);
-
-    private record LomadeeOffer(
-        [property: JsonPropertyName("description")] string? Description,
-        [property: JsonPropertyName("link")] string? Link,
-        [property: JsonPropertyName("barcode")] string? Barcode,
-        [property: JsonPropertyName("images")] List<string>? Images,
-        [property: JsonPropertyName("prices")] List<LomadeePrice>? Prices);
-
-    private record LomadeePrice(
-        [property: JsonPropertyName("price")] decimal Price);
 }

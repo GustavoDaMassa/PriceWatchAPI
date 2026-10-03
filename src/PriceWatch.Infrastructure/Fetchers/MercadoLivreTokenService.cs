@@ -6,7 +6,7 @@ using PriceWatch.Infrastructure.Settings;
 
 namespace PriceWatch.Infrastructure.Fetchers;
 
-public class MercadoLivreTokenService
+public class MercadoLivreTokenService : IMercadoLivreTokenProvider
 {
     private readonly HttpClient _httpClient;
     private readonly MercadoLivreSettings _settings;
