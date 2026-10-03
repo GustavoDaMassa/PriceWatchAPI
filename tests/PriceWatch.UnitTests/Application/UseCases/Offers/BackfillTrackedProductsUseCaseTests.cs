@@ -111,4 +111,93 @@ public class BackfillTrackedProductsUseCaseTests
 
         _subscriptions.Verify(r => r.CreateAsync(It.Is<UserProductSubscription>(s => !s.IsActive)), Times.Once);
     }
+
+    [Fact]
+    public async Task Execute_ShouldPreserveTheLegacyIdOnTheOfferAndTheSubscription()
+    {
+        var legacy = CreateLegacy();
+        legacy.RecordPrice(90m);
+        _trackedProducts.Setup(r => r.GetAllAsync()).ReturnsAsync([legacy]);
+
+        await _useCase.ExecuteAsync();
+
+        // o id da oferta é o do item legado, então o histórico já gravado em price_snapshots
+        // (chaveado pelo id do TrackedProduct) continua valendo; o da assinatura mantém os links da SPA
+        _offers.Verify(r => r.CreateAsync(It.Is<StoreOffer>(o => o.Id == legacy.Id)), Times.Once);
+        _subscriptions.Verify(r => r.CreateAsync(It.Is<UserProductSubscription>(s => s.Id == legacy.Id)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldRestoreTheLegacyLowestPrice()
+    {
+        var legacy = CreateLegacy();
+        legacy.RecordPrice(80m);
+        legacy.RecordPrice(120m);
+        _trackedProducts.Setup(r => r.GetAllAsync()).ReturnsAsync([legacy]);
+
+        await _useCase.ExecuteAsync();
+
+        _offers.Verify(r => r.CreateAsync(It.Is<StoreOffer>(o => o.CurrentPrice == 120m && o.LowestPrice == 80m)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldNotRealertWhenTheLegacyTargetAlertWasAlreadySent()
+    {
+        var legacy = CreateLegacy(targetPrice: 100m);
+        legacy.RecordPrice(90m);
+        legacy.MarkTargetAlertSent();
+        _trackedProducts.Setup(r => r.GetAllAsync()).ReturnsAsync([legacy]);
+
+        await _useCase.ExecuteAsync();
+
+        _subscriptions.Verify(r => r.CreateAsync(It.Is<UserProductSubscription>(s => s.TargetAlertSent)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_WhenTwoUsersTrackTheSameUrl_TheOldestKeepsTheOfferIdAndBothKeepTheirSubscriptionIds()
+    {
+        var oldest = DomainTrackedProduct.Create("user-1", "https://ml.com/same", ProductSource.MercadoLivre, "Produto", 100m);
+        oldest.RecordPrice(90m);
+        Thread.Sleep(5);
+        var newest = DomainTrackedProduct.Create("user-2", "https://ml.com/same", ProductSource.MercadoLivre, "Produto", 120m);
+        newest.RecordPrice(90m);
+        // devolvido fora de ordem de propósito: o mais antigo precisa ser processado primeiro
+        _trackedProducts.Setup(r => r.GetAllAsync()).ReturnsAsync([newest, oldest]);
+
+        StoreOffer? createdOffer = null;
+        _offers.Setup(r => r.CreateAsync(It.IsAny<StoreOffer>()))
+            .Callback<StoreOffer>(o => createdOffer = o)
+            .Returns(Task.CompletedTask);
+        _offers.Setup(r => r.GetBySourceAndUrlAsync(ProductSource.MercadoLivre, "https://ml.com/same"))
+            .ReturnsAsync(() => createdOffer);
+        Product? createdProduct = null;
+        _products.Setup(r => r.CreateAsync(It.IsAny<Product>()))
+            .Callback<Product>(p => createdProduct = p)
+            .Returns(Task.CompletedTask);
+        _products.Setup(r => r.GetByIdAsync(It.IsAny<string>())).ReturnsAsync(() => createdProduct);
+
+        await _useCase.ExecuteAsync();
+
+        createdOffer!.Id.Should().Be(oldest.Id);
+        _subscriptions.Verify(r => r.CreateAsync(It.Is<UserProductSubscription>(s => s.Id == oldest.Id && s.UserId == "user-1")), Times.Once);
+        _subscriptions.Verify(r => r.CreateAsync(It.Is<UserProductSubscription>(s => s.Id == newest.Id && s.UserId == "user-2")), Times.Once);
+        _offers.Verify(r => r.CreateAsync(It.IsAny<StoreOffer>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_WhenAnActiveItemJoinsAnInactiveSharedOffer_ReactivatesTheOffer()
+    {
+        var product = Product.Create("Produto Legado");
+        var inactiveOffer = StoreOffer.Create(product.Id, ProductSource.MercadoLivre, "https://ml.com/item");
+        inactiveOffer.Deactivate();
+        _offers.Setup(r => r.GetBySourceAndUrlAsync(ProductSource.MercadoLivre, "https://ml.com/item")).ReturnsAsync(inactiveOffer);
+        _products.Setup(r => r.GetByIdAsync(product.Id)).ReturnsAsync(product);
+        var legacy = CreateLegacy();
+        _trackedProducts.Setup(r => r.GetAllAsync()).ReturnsAsync([legacy]);
+
+        await _useCase.ExecuteAsync();
+
+        inactiveOffer.IsActive.Should().BeTrue();
+        _offers.Verify(r => r.UpdateAsync(inactiveOffer), Times.Once);
+    }
 }
