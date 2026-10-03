@@ -1,6 +1,11 @@
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using PriceWatch.API.Extensions;
 using PriceWatch.API.Middleware;
+using PriceWatch.API.RateLimiting;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
+using PriceWatch.Infrastructure.Settings;
 
 var localEnvPath = Path.Combine(Directory.GetCurrentDirectory(), "local.env");
 if (File.Exists(localEnvPath))
@@ -65,6 +70,26 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddApplicationServices(builder.Configuration);
 
+// Configuração lida via IOptions (lazy, resolvido só no primeiro uso em runtime) —
+// não em uma var capturada aqui, pois builder.Configuration só recebe os overrides de
+// teste (WebApplicationFactory.ConfigureAppConfiguration) no momento de builder.Build(),
+// depois que este trecho de Program.cs já teria rodado (ver Erros.md, padrão já usado
+// para MongoDb/Redis/Jwt).
+builder.Services.Configure<RateLimitingSettings>(builder.Configuration.GetSection("RateLimiting"));
+
+builder.Services.AddRateLimiter(options => options.RejectionStatusCode = StatusCodes.Status429TooManyRequests);
+
+builder.Services.AddOptions<RateLimiterOptions>()
+    .Configure<IOptions<RateLimitingSettings>>((rateLimiterOptions, rateLimitingOptions) =>
+    {
+        var settings = rateLimitingOptions.Value;
+        var window = TimeSpan.FromSeconds(settings.WindowSeconds);
+
+        rateLimiterOptions.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+            RateLimitPartitionSelector.Select(
+                httpContext, settings.AnonymousPermitLimit, settings.AuthenticatedPermitLimit, window));
+    });
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -76,6 +101,7 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseCors();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();

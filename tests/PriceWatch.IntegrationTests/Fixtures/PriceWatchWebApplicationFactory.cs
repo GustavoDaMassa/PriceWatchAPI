@@ -55,7 +55,11 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
             {
                 ["MongoDb:ConnectionString"] = _mongo.GetConnectionString(),
                 ["MongoDb:DatabaseName"] = "pricewatch_test",
-                ["Redis:ConnectionString"] = _redis.GetConnectionString()
+                ["Redis:ConnectionString"] = _redis.GetConnectionString(),
+                // limite alto o suficiente pra não interferir na suíte — rate limiting em si
+                // é coberto por um teste dedicado, não pela suíte de fluxo geral
+                ["RateLimiting:AnonymousPermitLimit"] = "10000",
+                ["RateLimiting:AuthenticatedPermitLimit"] = "10000"
             });
         });
 
