@@ -72,6 +72,8 @@ public class UnifiedCutoverTests
             .EnumerateArray().ToList();
         var item = items.Should().ContainSingle().Subject;
         item.GetProperty("id").GetString().Should().Be(legacy.Id);
+        // clientes usam o productId para abrir a comparação e a descoberta de ofertas
+        item.GetProperty("productId").GetString().Should().NotBeNullOrEmpty();
         item.GetProperty("url").GetString().Should().Be(url);
         item.GetProperty("name").GetString().Should().Be("Item Legado");
         item.GetProperty("targetPrice").GetDecimal().Should().Be(150m);

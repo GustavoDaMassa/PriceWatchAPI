@@ -101,7 +101,8 @@ public class UnifiedProductCatalogFacade : IProductCatalogFacade
 
         return new TrackedProductResponse(
             created.SubscriptionId, created.ListId, created.Name, created.Url, created.ImageUrl, created.Source,
-            created.TargetPrice, created.CurrentPrice, created.LowestPrice, created.IsActive, created.NextCheckAt);
+            created.TargetPrice, created.CurrentPrice, created.LowestPrice, created.IsActive, created.NextCheckAt,
+            created.ProductId);
     }
 
     public async Task UpdateProductAsync(string productId, string userId, UpdateProductRequest request)
@@ -216,7 +217,8 @@ public class UnifiedProductCatalogFacade : IProductCatalogFacade
             primary.CurrentPrice,
             lowest,
             subscription.IsActive,
-            primary.NextCheckAt);
+            primary.NextCheckAt,
+            subscription.ProductId);
     }
 
     // a oferta que representa o item: ativa, com preço conhecido, a mais barata
