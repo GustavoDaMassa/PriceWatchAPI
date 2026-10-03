@@ -8,6 +8,7 @@ using Polly;
 using Polly.Extensions.Http;
 using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
+using PriceWatch.Application.UseCases.Catalog;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
 using PriceWatch.Application.UseCases.Offers;
@@ -212,6 +213,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<BackfillTrackedProductsUseCase>();
         services.AddScoped<MatchStoreOfferUseCase>();
         services.AddScoped<CheckOfferPriceUseCase>();
+        services.AddScoped<LegacyProductCatalogFacade>();
+        services.AddScoped<UnifiedProductCatalogFacade>();
+        // escolhido a cada request pela flag (lazy via IOptions): cutover e rollback sem novo deploy
+        services.AddScoped<IProductCatalogFacade>(sp =>
+            sp.GetRequiredService<IOptions<FeatureFlags>>().Value.UnifiedCatalogEnabled
+                ? sp.GetRequiredService<UnifiedProductCatalogFacade>()
+                : sp.GetRequiredService<LegacyProductCatalogFacade>());
         services.AddScoped<SyncOfferActivityUseCase>();
 
         return services;
