@@ -10,6 +10,7 @@ using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
+using PriceWatch.Application.UseCases.Offers;
 using PriceWatch.Application.UseCases.ProductList;
 using PriceWatch.Application.UseCases.TrackedProduct;
 using PriceWatch.Application.UseCases.Users;
@@ -146,6 +147,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IStoreOfferRepository, StoreOfferRepository>();
         services.AddScoped<IUserProductSubscriptionRepository, UserProductSubscriptionRepository>();
+        services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
+        services.AddHostedService<ProductMatchingConsumer>();
 
         return services;
     }
@@ -183,6 +186,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ChangePasswordUseCase>();
         services.AddScoped<ChangeEmailUseCase>();
         services.AddScoped<DeleteAccountUseCase>();
+
+        // Offers (pivô multi-loja)
+        services.AddScoped<MatchStoreOfferUseCase>();
 
         return services;
     }

@@ -65,11 +65,13 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
 
         builder.ConfigureTestServices(services =>
         {
-            // remove workers — evita loop de check e consumer durante os testes
+            // remove workers — evita loop de check e consumer durante os testes; o matching
+            // é exercitado chamando MatchStoreOfferUseCase direto, não via consumer assíncrono
             var workers = services
                 .Where(d => d.ServiceType == typeof(IHostedService) &&
                            (d.ImplementationType == typeof(PriceCheckWorker) ||
-                            d.ImplementationType == typeof(RedisStreamConsumer)))
+                            d.ImplementationType == typeof(RedisStreamConsumer) ||
+                            d.ImplementationType == typeof(ProductMatchingConsumer)))
                 .ToList();
             foreach (var w in workers)
                 services.Remove(w);
