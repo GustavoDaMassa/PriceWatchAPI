@@ -151,6 +151,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IStoreOfferRepository, StoreOfferRepository>();
         services.AddScoped<IUserProductSubscriptionRepository, UserProductSubscriptionRepository>();
+        services.AddScoped<IClickLogRepository, ClickLogRepository>();
         services.AddHostedService<BackfillWorker>();
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
         services.AddHostedService<ProductMatchingConsumer>();

@@ -167,4 +167,46 @@ public class OfferFlowTests
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task ClickOffer_ReturnsTheStoreUrlAndRecordsTheClick()
+    {
+        var jwt = await GetAuthTokenAsync();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+        var url = $"https://produto.mercadolivre.com.br/MLB-{Guid.NewGuid():N}";
+        var created = await (await _client.PostAsJsonAsync("/api/offers", new { url, targetPrice = 100m }))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var offerId = created.GetProperty("offerId").GetString()!;
+
+        var response = await _client.PostAsync($"/api/offers/{offerId}/click", content: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("url").GetString().Should().Be(url);
+
+        using var scope = _factory.Services.CreateScope();
+        var clicks = scope.ServiceProvider.GetRequiredService<IClickLogRepository>();
+        (await clicks.CountByOfferIdAsync(offerId)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ClickOffer_WithoutToken_Returns401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.PostAsync($"/api/offers/{Guid.NewGuid()}/click", content: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task ClickOffer_ForAnUnknownOffer_Returns404()
+    {
+        var jwt = await GetAuthTokenAsync();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+
+        var response = await _client.PostAsync($"/api/offers/{Guid.NewGuid()}/click", content: null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

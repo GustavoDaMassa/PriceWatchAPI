@@ -1,4 +1,5 @@
 using PriceWatch.Application.Interfaces;
+using PriceWatch.Domain.Entities;
 using PriceWatch.Domain.Exceptions;
 using PriceWatch.Domain.Interfaces.Repositories;
 
@@ -8,14 +9,19 @@ public class RedirectOfferUseCase
 {
     private readonly IStoreOfferRepository _offers;
     private readonly IAffiliateLinkResolver _affiliateResolver;
+    private readonly IClickLogRepository _clicks;
 
-    public RedirectOfferUseCase(IStoreOfferRepository offers, IAffiliateLinkResolver affiliateResolver)
+    public RedirectOfferUseCase(
+        IStoreOfferRepository offers,
+        IAffiliateLinkResolver affiliateResolver,
+        IClickLogRepository clicks)
     {
         _offers = offers;
         _affiliateResolver = affiliateResolver;
+        _clicks = clicks;
     }
 
-    public async Task<StoreOfferRedirectResult> ExecuteAsync(string offerId)
+    public async Task<StoreOfferRedirectResult> ExecuteAsync(string offerId, string userId)
     {
         var offer = await _offers.GetByIdAsync(offerId)
             ?? throw new StoreOfferNotFoundException(offerId);
@@ -27,6 +33,8 @@ public class RedirectOfferUseCase
             offer.SetAffiliateUrl(affiliateUrl);
             await _offers.UpdateAsync(offer);
         }
+
+        await _clicks.CreateAsync(ClickLog.Create(offer.Id, userId));
 
         return new StoreOfferRedirectResult(offer.Id, offer.Source, offer.AffiliateUrl!);
     }

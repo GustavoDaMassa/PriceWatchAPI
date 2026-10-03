@@ -69,7 +69,7 @@ public class OffersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RedirectToOffer(string id)
     {
-        var result = await _redirectOffer.ExecuteAsync(id);
+        var result = await _redirectOffer.ExecuteAsync(id, GetUserId());
 
         _logger.LogInformation(
             "Affiliate redirect click: offer {OfferId}, source {Source}, user {UserId}",
@@ -78,6 +78,30 @@ public class OffersController : ControllerBase
         return Redirect(result.AffiliateUrl);
     }
 
+    /// <summary>Registra o clique e devolve a URL da loja (link de afiliado) em JSON.</summary>
+    /// <remarks>
+    /// Equivalente ao GET /redirect para clientes que não conseguem anexar o JWT a uma navegação
+    /// (SPA, extensão, app): o cliente chama este endpoint e abre a URL devolvida.
+    /// </remarks>
+    /// <param name="id">ID da oferta.</param>
+    /// <response code="200">URL de destino.</response>
+    /// <response code="404">Oferta não encontrada.</response>
+    [HttpPost("/api/offers/{id}/click")]
+    [ProducesResponseType(typeof(OfferClickResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ClickOffer(string id)
+    {
+        var result = await _redirectOffer.ExecuteAsync(id, GetUserId());
+
+        _logger.LogInformation(
+            "Affiliate click: offer {OfferId}, source {Source}, user {UserId}",
+            result.OfferId, result.Source, GetUserId());
+
+        return Ok(new OfferClickResponse(result.AffiliateUrl));
+    }
+
     private string GetUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier)
         ?? throw new BusinessException("User ID not found in token.");
 }
+
+public record OfferClickResponse(string Url);
