@@ -66,5 +66,20 @@ public class OfferCandidate
             CreatedAt = createdAt, ExpiresAt = expiresAt
         };
 
+    // nova busca encontrou a mesma oferta (mesma loja e URL): atualiza preço/nome e renova a validade,
+    // mantendo o id para os vereditos já dados continuarem apontando para ela
+    public void Refresh(OfferSearchResult found, double score, CandidateReason reason, TimeSpan timeToLive)
+    {
+        Name = found.Name;
+        Price = found.Price;
+        ImageUrl = found.ImageUrl;
+        Gtin = found.Gtin;
+        Brand = found.Brand;
+        Model = found.Model;
+        Score = score;
+        Reason = reason;
+        ExpiresAt = DateTime.UtcNow.Add(timeToLive);
+    }
+
     public bool IsExpired() => ExpiresAt <= DateTime.UtcNow;
 }

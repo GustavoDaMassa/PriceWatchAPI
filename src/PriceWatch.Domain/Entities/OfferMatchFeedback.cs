@@ -35,6 +35,14 @@ public class OfferMatchFeedback
             CreatedAt = DateTime.UtcNow
         };
 
+    // o usuário mudou de ideia sobre a mesma candidata
+    public void Revise(MatchVerdict verdict, bool track)
+    {
+        Verdict = verdict;
+        Track = verdict == MatchVerdict.Same && track;
+        CreatedAt = DateTime.UtcNow;
+    }
+
     public static OfferMatchFeedback Restore(
         string id, string userId, string candidateId, string productId, string url,
         MatchVerdict verdict, bool track, DateTime createdAt) =>
