@@ -519,6 +519,19 @@ graph LR
 
 Mesmo fluxo de deploy do home server (`git push → GitHub Actions → Docker Hub → Watchtower`). Em VPS com IP público o Cloudflare Tunnel deixa de ser necessário: o Cloudflare passa a fazer proxy do tráfego e do TLS. O home server vira staging. Custos em `analise-financeira.md`.
 
+## Feature flags e produção segura (M0)
+
+O merge na `main` publica em produção (Watchtower), então todo comportamento novo do pivô nasce **desligado** e é ligado por variável de ambiente, sem novo deploy de código. Flags em `Infrastructure/Settings/FeatureFlags.cs` (seção `Features`):
+
+| Flag (env) | Padrão | Efeito |
+|---|---|---|
+| `Features__BackfillEnabled` (`FEATURE_BACKFILL_ENABLED`) | `false` | Liga o `BackfillWorker` (migra `TrackedProduct` legado para `Product`/`StoreOffer`/`UserProductSubscription`) |
+| `Features__MatchingEnabled` (`FEATURE_MATCHING_ENABLED`) | `false` | Liga o `ProductMatchingConsumer` (matching assíncrono) |
+
+Os workers continuam registrados e checam a flag em runtime (a configuração é lida via `IOptions`, de forma lazy, compatível com os overrides dos testes de integração). Flags planejadas: `OfferMonitoringEnabled` e `LegacyMonitoringEnabled` (M1).
+
+**Integração Lomadee/Kabum:** sem `Lomadee__AppToken` e `Lomadee__SourceId`, `LomadeeSettings.IsConfigured` é `false`; `KabumFetcher.CanHandle` e `LomadeeDeeplinkGenerator.CanHandle` retornam `false`. Uma URL da Kabum cai em "nenhum fetcher encontrado" (400) e o redirect usa o passthrough, sem falha em runtime.
+
 ## Decisões Técnicas — v1
 
 | # | Decisão | Motivo |
