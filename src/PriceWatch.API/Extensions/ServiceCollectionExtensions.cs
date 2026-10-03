@@ -152,7 +152,17 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
         services.AddHostedService<ProductMatchingConsumer>();
 
+        // Lomadee/SocialSoul — agregador de afiliados escolhido na Fase 6 (cobre Kabum, ver docs/arquitetura.md)
+        services.Configure<LomadeeSettings>(configuration.GetSection("Lomadee"));
+        services.AddScoped<IPriceFetcher, KabumFetcher>();
+        services.AddHttpClient<KabumFetcher>()
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
         // Passthrough sempre por último — CanHandle universal funciona como fallback do resolver
+        services.AddScoped<IAffiliateLinkGenerator, LomadeeDeeplinkGenerator>();
+        services.AddHttpClient<LomadeeDeeplinkGenerator>()
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
         services.AddScoped<IAffiliateLinkGenerator, PassthroughAffiliateLinkGenerator>();
         services.AddScoped<IAffiliateLinkResolver, AffiliateLinkResolver>();
 

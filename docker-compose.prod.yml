@@ -34,6 +34,8 @@ services:
       AllowedOrigins__0: "https://pricewatch.gustavohdev.com.br"
       MercadoLivre__ClientId: ${MERCADOLIVRE_CLIENT_ID}
       MercadoLivre__ClientSecret: ${MERCADOLIVRE_CLIENT_SECRET}
+      Lomadee__AppToken: ${LOMADEE_APP_TOKEN}
+      Lomadee__SourceId: ${LOMADEE_SOURCE_ID}
     depends_on:
       - pricewatch-mongo
       - pricewatch-redis
