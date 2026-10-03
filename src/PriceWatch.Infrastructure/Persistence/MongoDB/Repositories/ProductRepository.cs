@@ -21,6 +21,16 @@ public class ProductRepository : IProductRepository
         return doc is null ? null : ProductMappings.ToDomain(doc);
     }
 
+    public async Task<IEnumerable<Product>> GetByIdsAsync(IEnumerable<string> ids)
+    {
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0)
+            return Enumerable.Empty<Product>();
+
+        var docs = await _collection.Find(d => idList.Contains(d.Id)).ToListAsync();
+        return docs.Select(ProductMappings.ToDomain);
+    }
+
     public async Task<Product?> GetByGtinAsync(string gtin, string? excludeId = null)
     {
         var filter = excludeId is null

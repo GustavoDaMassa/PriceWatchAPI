@@ -8,6 +8,7 @@ public interface IStoreOfferRepository
     Task<StoreOffer?> GetByIdAsync(string id);
     Task<StoreOffer?> GetBySourceAndUrlAsync(ProductSource source, string url);
     Task<IEnumerable<StoreOffer>> GetByProductIdAsync(string productId);
+    Task<IEnumerable<StoreOffer>> GetByProductIdsAsync(IEnumerable<string> productIds);
     Task<IEnumerable<StoreOffer>> GetDueForCheckAsync();
     Task CreateAsync(StoreOffer offer);
     Task UpdateAsync(StoreOffer offer);
