@@ -68,7 +68,7 @@
 
 **atributos:** `Id`, `ListId`, `UserId`, `Url`, `Source`, `Name`, `ImageUrl?`, `TargetPrice`, `CurrentPrice`, `LowestPrice`, `CheckIntervalHours`, `NextCheckAt`, `LastCheckedAt?`, `IsActive`, `Metadata`, `CreatedAt` — todos `private set`
 
-**métodos:** `Create(listId, userId, url, source, name, targetPrice)`, `Restore(...)`, `RecordPrice(price) → PriceSnapshot`, `ShouldTriggerTargetAlert()`, `ShouldTriggerLowestAlert(previousLowest)`, `Deactivate()`
+**métodos:** `Create(listId, userId, url, source, name, targetPrice)`, `Restore(...)`, `RecordPrice(price) → PriceSnapshot`, `ShouldTriggerTargetAlert()`, `ShouldTriggerLowestAlert(previousLowest)`, `Deactivate()`, `MarkMigratedToProduct(productId)` / `IsMigratedToProduct()` (Fase 4 — marca de idempotência do backfill pro pivô multi-loja, ver [BackfillTrackedProductsUseCase](#BackfillTrackedProductsUseCase))
 
 </blockquote>
 </details>
@@ -84,6 +84,45 @@
 </blockquote>
 </details>
 
+<details id="Product">
+<summary><strong><a href="../src/PriceWatch.Domain/Entities/Product.cs">Product.cs</a> [class]</strong></summary>
+<blockquote>
+
+**atributos:** `Id`, `Gtin?`, `Name`, `Brand?`, `Model?`, `ImageUrl?`, `MatchStatus`, `SuggestedMatchProductId?`, `CreatedAt` — todos `private set`
+
+**métodos:** `Create(name, gtin?, brand?, model?, imageUrl?)`, `Restore(...)`, `MarkAutoMatched()`, `SuggestMatch(candidateProductId)` — nunca funde, só marca `PendingReview` + grava o candidato (RF15/RI07), `Confirm()`, `Reject()`, `IsVisibleInComparison()` — `true` pra `Unmatched/AutoMatched/Confirmed`
+
+**uso:** produto-mestre do pivô multi-loja (Fase 4) — catálogo compartilhado entre usuários, agrega N [StoreOffer](#StoreOffer)
+
+</blockquote>
+</details>
+
+<details id="StoreOffer">
+<summary><strong><a href="../src/PriceWatch.Domain/Entities/StoreOffer.cs">StoreOffer.cs</a> [class]</strong></summary>
+<blockquote>
+
+**atributos:** `Id`, `ProductId`, `Source`, `Url`, `Gtin?`, `CurrentPrice`, `LowestPrice`, `AffiliateUrl?`, `CheckIntervalHours`, `NextCheckAt`, `LastCheckedAt?`, `IsActive`, `CreatedAt` — todos `private set`
+
+**métodos:** `Create(productId, source, url, gtin?)`, `Restore(...)`, `RecordPrice(price) → PriceSnapshot` (reaproveita a coleção `price_snapshots` do [TrackedProduct](#TrackedProduct) legado), `SetAffiliateUrl(url)`, `Activate()`, `Deactivate()`, `ReassignToProduct(productId)` — usado pelo motor de matching pra unificar ofertas do mesmo produto físico
+
+**uso:** oferta de uma loja específica pra um [Product](#Product) (Fase 4)
+
+</blockquote>
+</details>
+
+<details id="UserProductSubscription">
+<summary><strong><a href="../src/PriceWatch.Domain/Entities/UserProductSubscription.cs">UserProductSubscription.cs</a> [class]</strong></summary>
+<blockquote>
+
+**atributos:** `Id`, `UserId`, `ProductId`, `ListId?`, `TargetPrice`, `IsActive`, `TargetAlertSent`, `CreatedAt` — todos `private set`
+
+**métodos:** `Create(userId, productId, targetPrice, listId?)`, `Restore(...)`, `SetTargetPrice(price)`, `AssignToList(listId)`, `RemoveFromList()`, `Activate()`, `Deactivate()`, `ShouldTriggerTargetAlert(currentPrice)`, `MarkTargetAlertSent()`, `ReassignToProduct(productId)`
+
+**uso:** vínculo por usuário com um [Product](#Product) (preço-alvo, alertas, lista) — substitui o papel "por usuário" que o [TrackedProduct](#TrackedProduct) legado carregava sozinho (Fase 4)
+
+</blockquote>
+</details>
+
 </blockquote>
 </details>
 
@@ -93,6 +132,16 @@
 
 - [ProductSource.cs](../src/PriceWatch.Domain/Enums/ProductSource.cs) — `MercadoLivre, Kabum, Manual`
 - [NotificationType.cs](../src/PriceWatch.Domain/Enums/NotificationType.cs) — `TargetPriceReached, NewLowestPrice`
+- [MatchStatus.cs](../src/PriceWatch.Domain/Enums/MatchStatus.cs) — `Unmatched, AutoMatched, PendingReview, Confirmed, Rejected` (Fase 4 — pivô multi-loja)
+
+</blockquote>
+</details>
+
+<details id="dir-domain-valueobjects">
+<summary><strong>ValueObjects/</strong></summary>
+<blockquote>
+
+- [ProductFetchResult.cs](../src/PriceWatch.Domain/ValueObjects/ProductFetchResult.cs) — `record(Price, Name, ImageUrl?, Gtin?, Brand?, Model?)` — retorno de `IPriceFetcher.FetchAsync`; `Gtin`/`Brand`/`Model` adicionados na Fase 3 (aditivo, mudança compatível com o único uso existente)
 
 </blockquote>
 </details>
@@ -173,6 +222,28 @@
 </blockquote>
 </details>
 
+<details id="ProductNotFoundException">
+<summary><strong><a href="../src/PriceWatch.Domain/Exceptions/ProductNotFoundException.cs">ProductNotFoundException.cs</a> [class]</strong></summary>
+<blockquote>
+
+**extends:** [NotFoundException](#NotFoundException)
+
+**construtor:** `(string identifier)` — Fase 4, pivô multi-loja
+
+</blockquote>
+</details>
+
+<details id="StoreOfferNotFoundException">
+<summary><strong><a href="../src/PriceWatch.Domain/Exceptions/StoreOfferNotFoundException.cs">StoreOfferNotFoundException.cs</a> [class]</strong></summary>
+<blockquote>
+
+**extends:** [NotFoundException](#NotFoundException)
+
+**construtor:** `(string identifier)` — Fase 4, pivô multi-loja
+
+</blockquote>
+</details>
+
 </blockquote>
 </details>
 
@@ -202,7 +273,9 @@
 <summary><strong><a href="../src/PriceWatch.Domain/Interfaces/Repositories/ITrackedProductRepository.cs">ITrackedProductRepository.cs</a> [interface]</strong></summary>
 <blockquote>
 
-**métodos:** `GetByListIdAsync(listId)`, `GetByIdAsync(id)`, `GetDueForCheckAsync()`, `CreateAsync(product)`, `UpdateAsync(product)`, `DeleteAsync(id)`
+**métodos (doc pré-pivot incompleta — só o essencial listado):** `GetByListIdAsync(listId)`, `GetByIdAsync(id)`, `GetDueForCheckAsync()`, `CreateAsync(product)`, `UpdateAsync(product)`, `DeleteAsync(id)`
+
+**adicionado na Fase 4 (pivô):** `GetAllAsync()` — usado por [BackfillTrackedProductsUseCase](#BackfillTrackedProductsUseCase) pra migrar todo o legado, independente de dono/status
 
 </blockquote>
 </details>
@@ -211,7 +284,36 @@
 <summary><strong><a href="../src/PriceWatch.Domain/Interfaces/Repositories/IPriceSnapshotRepository.cs">IPriceSnapshotRepository.cs</a> [interface]</strong></summary>
 <blockquote>
 
-**métodos:** `CreateAsync(snapshot)`, `GetByProductIdAsync(productId, limit=100)`
+**métodos:** `CreateAsync(snapshot)`, `GetByProductIdAsync(productId, limit=100)`, `DeleteByProductIdAsync(productId)`
+
+</blockquote>
+</details>
+
+<details id="IProductRepository">
+<summary><strong><a href="../src/PriceWatch.Domain/Interfaces/Repositories/IProductRepository.cs">IProductRepository.cs</a> [interface]</strong></summary>
+<blockquote>
+
+**métodos:** `GetByIdAsync(id)`, `GetByGtinAsync(gtin, excludeId?)`, `GetWithoutGtinAsync(excludeId)`, `CreateAsync(product)`, `UpdateAsync(product)`
+
+**uso:** Fase 4 (pivô) — [ProductRepository](#ProductRepository) é a implementação Mongo
+
+</blockquote>
+</details>
+
+<details id="IStoreOfferRepository">
+<summary><strong><a href="../src/PriceWatch.Domain/Interfaces/Repositories/IStoreOfferRepository.cs">IStoreOfferRepository.cs</a> [interface]</strong></summary>
+<blockquote>
+
+**métodos:** `GetByIdAsync(id)`, `GetBySourceAndUrlAsync(source, url)` — dedup na criação, `GetByProductIdAsync(productId)`, `GetDueForCheckAsync()`, `CreateAsync(offer)`, `UpdateAsync(offer)`
+
+</blockquote>
+</details>
+
+<details id="IUserProductSubscriptionRepository">
+<summary><strong><a href="../src/PriceWatch.Domain/Interfaces/Repositories/IUserProductSubscriptionRepository.cs">IUserProductSubscriptionRepository.cs</a> [interface]</strong></summary>
+<blockquote>
+
+**métodos:** `GetByIdAsync(id)`, `GetByUserIdAndProductIdAsync(userId, productId)`, `GetByProductIdAsync(productId)`, `GetByUserIdAsync(userId, listId?)`, `CreateAsync(subscription)`, `UpdateAsync(subscription)`, `DeleteAsync(id)`, `UnlinkByListIdAsync(listId)`
 
 </blockquote>
 </details>
@@ -228,6 +330,26 @@
 - [IEmailSender.cs](../src/PriceWatch.Domain/Interfaces/Services/IEmailSender.cs) — `SendVerificationEmailAsync(email, name, token)`
 - [IPriceFetcher.cs](../src/PriceWatch.Domain/Interfaces/Services/IPriceFetcher.cs) — `string Source { get; }`, `FetchAsync(url) → decimal`
 - [IAlertPublisher.cs](../src/PriceWatch.Domain/Interfaces/Services/IAlertPublisher.cs) — `PublishAsync(productId, userId, productName, type, currentPrice)`
+- [IAffiliateLinkGenerator.cs](../src/PriceWatch.Domain/Interfaces/Services/IAffiliateLinkGenerator.cs) — `ProductSource ProductSource { get; }`, `CanHandle(url)`, `GenerateAsync(originalUrl) → string` (Fase 4/6 — pivô)
+- [IProductMatchingEventPublisher.cs](../src/PriceWatch.Domain/Interfaces/Services/IProductMatchingEventPublisher.cs) — `PublishAsync(offerId, productId)` (Fase 5 — pivô)
+
+</blockquote>
+</details>
+
+<details id="dir-domain-services">
+<summary><strong>Services/</strong></summary>
+<blockquote>
+
+<details id="TitleSimilarity">
+<summary><strong><a href="../src/PriceWatch.Domain/Services/TitleSimilarity.cs">TitleSimilarity.cs</a> [static partial class]</strong></summary>
+<blockquote>
+
+**métodos:** `Normalize(title) → string` (lowercase, remove pontuação, colapsa espaços), `Ratio(a, b) → double` (0–1, baseado em distância de Levenshtein)
+
+**uso:** fallback de fuzzy matching quando não há GTIN (Fase 5) — usado por [MatchStoreOfferUseCase](#MatchStoreOfferUseCase); não é o algoritmo final, é o ponto de extensão v1 (ver docs/arquitetura.md)
+
+</blockquote>
+</details>
 
 </blockquote>
 </details>
@@ -255,6 +377,7 @@
 <blockquote>
 
 - [IPriceFetcherResolver.cs](../src/PriceWatch.Application/Interfaces/IPriceFetcherResolver.cs) — `Resolve(ProductSource) → IPriceFetcher`
+- [IAffiliateLinkResolver.cs](../src/PriceWatch.Application/Interfaces/IAffiliateLinkResolver.cs) — `Resolve(ProductSource) → IAffiliateLinkGenerator`, `Resolve(url) → IAffiliateLinkGenerator` — nunca lança, cai no passthrough se nada específico for achado (Fase 4/6)
 
 </blockquote>
 </details>
@@ -289,6 +412,18 @@
 
 - [NotificationResponse.cs](../src/PriceWatch.Application/DTOs/Notification/NotificationResponse.cs) — `record(Id, ProductId, ProductName, Type, Message, IsRead, CreatedAt)`
 - [AlertEvent.cs](../src/PriceWatch.Application/DTOs/Notification/AlertEvent.cs) — `record(ProductId, UserId, ProductName, Type, CurrentPrice, UserEmail)` — usado pelo Redis Streams
+
+</blockquote>
+</details>
+
+<details id="dir-application-dtos-offer">
+<summary><strong>DTOs/Offer/ (Fase 4 — pivô multi-loja)</strong></summary>
+<blockquote>
+
+- [CreateOfferRequest.cs](../src/PriceWatch.Application/DTOs/Offer/CreateOfferRequest.cs) — `record(Url, TargetPrice, ListId?)`
+- [OfferResponse.cs](../src/PriceWatch.Application/DTOs/Offer/OfferResponse.cs) — `record(SubscriptionId, ProductId, OfferId, Name, Url, ImageUrl?, Source, TargetPrice, CurrentPrice, LowestPrice, IsActive, NextCheckAt)`
+- [ProductComparisonResponse.cs](../src/PriceWatch.Application/DTOs/Offer/ProductComparisonResponse.cs) — `record(ProductId, Name, ImageUrl?, Offers: IReadOnlyList<StoreOfferSummary>)` + `record StoreOfferSummary(OfferId, Source, CurrentPrice, IsCheapest)`
+- [StoreOfferCreatedEvent.cs](../src/PriceWatch.Application/DTOs/Offer/StoreOfferCreatedEvent.cs) — `record(OfferId, ProductId)` — payload do stream `store-offer-events` (Fase 5)
 
 </blockquote>
 </details>
@@ -480,6 +615,68 @@
 </blockquote>
 </details>
 
+<details id="dir-application-usecases-offers">
+<summary><strong>UseCases/Offers/ (Fases 4–6 — pivô multi-loja)</strong></summary>
+<blockquote>
+
+<details id="CreateOfferUseCase">
+<summary><strong><a href="../src/PriceWatch.Application/UseCases/Offers/CreateOfferUseCase.cs">CreateOfferUseCase.cs</a> [class]</strong></summary>
+<blockquote>
+
+**dependências:** [IProductRepository](#IProductRepository), [IStoreOfferRepository](#IStoreOfferRepository), [IUserProductSubscriptionRepository](#IUserProductSubscriptionRepository), `IPriceFetcherResolver`, [IProductMatchingEventPublisher](#IProductMatchingEventPublisher)
+
+**métodos:** `ExecuteAsync(userId, CreateOfferRequest) → OfferResponse` — dedup por (source, url); se oferta nova, cria [Product](#Product)+[StoreOffer](#StoreOffer) e publica evento de matching; sempre garante/atualiza a [UserProductSubscription](#UserProductSubscription) do usuário
+
+</blockquote>
+</details>
+
+<details id="GetProductComparisonUseCase">
+<summary><strong><a href="../src/PriceWatch.Application/UseCases/Offers/GetProductComparisonUseCase.cs">GetProductComparisonUseCase.cs</a> [class]</strong></summary>
+<blockquote>
+
+**dependências:** [IProductRepository](#IProductRepository), [IStoreOfferRepository](#IStoreOfferRepository)
+
+**métodos:** `ExecuteAsync(productId) → ProductComparisonResponse` — ofertas ativas ordenadas por preço, marca a mais barata; lança [ProductNotFoundException](#ProductNotFoundException)
+
+</blockquote>
+</details>
+
+<details id="RedirectOfferUseCase">
+<summary><strong><a href="../src/PriceWatch.Application/UseCases/Offers/RedirectOfferUseCase.cs">RedirectOfferUseCase.cs</a> [class]</strong></summary>
+<blockquote>
+
+**dependências:** [IStoreOfferRepository](#IStoreOfferRepository), `IAffiliateLinkResolver`
+
+**métodos:** `ExecuteAsync(offerId) → StoreOfferRedirectResult(OfferId, Source, AffiliateUrl)` — resolve/cacheia o link de afiliado em `StoreOffer.AffiliateUrl`; lança [StoreOfferNotFoundException](#StoreOfferNotFoundException)
+
+</blockquote>
+</details>
+
+<details id="BackfillTrackedProductsUseCase">
+<summary><strong><a href="../src/PriceWatch.Application/UseCases/Offers/BackfillTrackedProductsUseCase.cs">BackfillTrackedProductsUseCase.cs</a> [class]</strong></summary>
+<blockquote>
+
+**dependências:** [ITrackedProductRepository](#ITrackedProductRepository), [IProductRepository](#IProductRepository), [IStoreOfferRepository](#IStoreOfferRepository), [IUserProductSubscriptionRepository](#IUserProductSubscriptionRepository), [IProductMatchingEventPublisher](#IProductMatchingEventPublisher)
+
+**métodos:** `ExecuteAsync() → int` (migrados) — migração aditiva do [TrackedProduct](#TrackedProduct) legado pro modelo novo; idempotente via `TrackedProduct.MarkMigratedToProduct/IsMigratedToProduct`; chamado por [BackfillWorker](#BackfillWorker)
+
+</blockquote>
+</details>
+
+<details id="MatchStoreOfferUseCase">
+<summary><strong><a href="../src/PriceWatch.Application/UseCases/Offers/MatchStoreOfferUseCase.cs">MatchStoreOfferUseCase.cs</a> [class]</strong></summary>
+<blockquote>
+
+**dependências:** [IProductRepository](#IProductRepository), [IStoreOfferRepository](#IStoreOfferRepository), [IUserProductSubscriptionRepository](#IUserProductSubscriptionRepository)
+
+**métodos:** `ExecuteAsync(offerId, productId)` — consumido por [ProductMatchingConsumer](#ProductMatchingConsumer). GTIN bate com outro produto → funde de fato (`StoreOffer.ReassignToProduct`, subscrições realocadas/removidas se duplicadas, produto vira `AutoMatched`). Sem GTIN → fuzzy via [TitleSimilarity](#TitleSimilarity) (threshold 0.82 c/ marca igual, 0.92 sem) — nunca funde, só `Product.SuggestMatch()` (RF14/RF15/RI06/RI07)
+
+</blockquote>
+</details>
+
+</blockquote>
+</details>
+
 </blockquote>
 </details>
 
@@ -510,12 +707,15 @@
 <summary><strong>Persistence/MongoDB/Documents/</strong></summary>
 <blockquote>
 
-- [MongoDbIndexInitializer.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/MongoDbIndexInitializer.cs) — cria todos os índices das 5 collections no startup; idempotente
+- [MongoDbIndexInitializer.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/MongoDbIndexInitializer.cs) — cria os índices no startup; idempotente. Fase 4 (pivô) adicionou índices de `products` (gtin), `store_offers` (productId, check queue, source+url único) e `user_product_subscriptions` (userId+productId único, listId)
 - [UserDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/UserDocument.cs) — documento MongoDB para [User](#User)
 - [ProductListDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/ProductListDocument.cs) — documento MongoDB para [ProductList](#ProductList)
 - [TrackedProductDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/TrackedProductDocument.cs) — documento MongoDB para [TrackedProduct](#TrackedProduct)
 - [PriceSnapshotDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/PriceSnapshotDocument.cs) — documento MongoDB para [PriceSnapshot](#PriceSnapshot)
 - [NotificationDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/NotificationDocument.cs) — documento MongoDB para [Notification](#Notification)
+- [ProductDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/ProductDocument.cs) — documento MongoDB para [Product](#Product) (Fase 4, collection `products`)
+- [StoreOfferDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/StoreOfferDocument.cs) — documento MongoDB para [StoreOffer](#StoreOffer) (Fase 4, collection `store_offers`)
+- [UserProductSubscriptionDocument.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Documents/UserProductSubscriptionDocument.cs) — documento MongoDB para [UserProductSubscription](#UserProductSubscription) (Fase 4, collection `user_product_subscriptions`)
 
 </blockquote>
 </details>
@@ -529,6 +729,9 @@
 - [TrackedProductMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/TrackedProductMappings.cs) — `ToDocument(TrackedProduct)`, `ToDomain(TrackedProductDocument)`
 - [PriceSnapshotMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/PriceSnapshotMappings.cs) — `ToDocument(PriceSnapshot)`, `ToDomain(PriceSnapshotDocument)`
 - [NotificationMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/NotificationMappings.cs) — `ToDocument(Notification)`, `ToDomain(NotificationDocument)`
+- [ProductMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/ProductMappings.cs) — `ToDocument(Product)`, `ToDomain(ProductDocument)` (Fase 4)
+- [StoreOfferMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/StoreOfferMappings.cs) — `ToDocument(StoreOffer)`, `ToDomain(StoreOfferDocument)` (Fase 4)
+- [UserProductSubscriptionMappings.cs](../src/PriceWatch.Infrastructure/Persistence/MongoDB/Mappings/UserProductSubscriptionMappings.cs) — `ToDocument(UserProductSubscription)`, `ToDomain(UserProductSubscriptionDocument)` (Fase 4)
 
 </blockquote>
 </details>
@@ -581,6 +784,39 @@
 </blockquote>
 </details>
 
+<details id="ProductRepository">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Persistence/MongoDB/Repositories/ProductRepository.cs">ProductRepository.cs</a> [class]</strong></summary>
+<blockquote>
+
+**implements:** [IProductRepository](#IProductRepository)
+
+**dependências:** `IMongoDatabase` — collection `products` (Fase 4)
+
+</blockquote>
+</details>
+
+<details id="StoreOfferRepository">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Persistence/MongoDB/Repositories/StoreOfferRepository.cs">StoreOfferRepository.cs</a> [class]</strong></summary>
+<blockquote>
+
+**implements:** [IStoreOfferRepository](#IStoreOfferRepository)
+
+**dependências:** `IMongoDatabase` — collection `store_offers` (Fase 4)
+
+</blockquote>
+</details>
+
+<details id="UserProductSubscriptionRepository">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Persistence/MongoDB/Repositories/UserProductSubscriptionRepository.cs">UserProductSubscriptionRepository.cs</a> [class]</strong></summary>
+<blockquote>
+
+**implements:** [IUserProductSubscriptionRepository](#IUserProductSubscriptionRepository)
+
+**dependências:** `IMongoDatabase` — collection `user_product_subscriptions` (Fase 4)
+
+</blockquote>
+</details>
+
 </blockquote>
 </details>
 
@@ -628,6 +864,32 @@
 </blockquote>
 </details>
 
+<details id="RedisStoreOfferEventPublisher">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Messaging/RedisStoreOfferEventPublisher.cs">RedisStoreOfferEventPublisher.cs</a> [class]</strong></summary>
+<blockquote>
+
+**implements:** [IProductMatchingEventPublisher](#IProductMatchingEventPublisher)
+
+**dependências:** `IConnectionMultiplexer`
+
+**comportamento:** publica `StoreOfferCreatedEvent` serializado como JSON no stream `"store-offer-events"` (Fase 5)
+
+</blockquote>
+</details>
+
+<details id="ProductMatchingConsumer">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Messaging/ProductMatchingConsumer.cs">ProductMatchingConsumer.cs</a> [class]</strong></summary>
+<blockquote>
+
+**extends:** `BackgroundService`
+
+**dependências:** `IConnectionMultiplexer`, `IServiceScopeFactory`, `ILogger<ProductMatchingConsumer>`
+
+**comportamento:** loop a cada 5s — consumer group `matching-group`; desserializa `StoreOfferCreatedEvent`, chama [MatchStoreOfferUseCase](#MatchStoreOfferUseCase), faz `StreamAcknowledge`. Desligado nos testes de integração (mesmo padrão do [RedisStreamConsumer](#RedisStreamConsumer)) — Fase 5
+
+</blockquote>
+</details>
+
 </blockquote>
 </details>
 
@@ -643,7 +905,7 @@
 
 **dependências:** `IHttpClientFactory`
 
-**Source:** `"mercadolivre"` — `FetchAsync` retorna `0m` (placeholder; integração ML futura)
+**Source:** `"mercadolivre"` — `FetchAsync` retorna `0m` (placeholder; integração ML futura) — **nota: descrição pré-pivot desatualizada, a integração real com a API de catálogo do ML já existe.** Fase 3 (pivô): passou a extrair `Gtin`/`Brand`/`Model` do array `attributes` do payload (já consumido, só não desserializado antes) — ver `ProductFetchResult`
 
 </blockquote>
 </details>
@@ -657,6 +919,67 @@
 **dependências:** `IEnumerable<IPriceFetcher>` — padrão Strategy/OCP
 
 **métodos:** `Resolve(ProductSource)` — lança [BusinessException](#BusinessException) se fetcher não encontrado
+
+</blockquote>
+</details>
+
+<details id="KabumFetcher">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Fetchers/KabumFetcher.cs">KabumFetcher.cs</a> [partial class]</strong></summary>
+<blockquote>
+
+**implements:** [IPriceFetcher](#IPriceFetcher)
+
+**dependências:** `HttpClient`, `IOptions<LomadeeSettings>`
+
+**comportamento:** busca via API de ofertas da Lomadee (`GET {baseUrl}/{appToken}/offer/_search?...&keyword=...`) — não há lookup direto por URL como no ML, então extrai palavra-chave do slug da URL e casa pelo campo `link` retornado (fallback: primeira oferta Kabum). Extrai `barcode` como GTIN (Fase 6)
+
+**⚠️ não validado contra a API real** — endpoint/campos seguem a doc pública da Lomadee Developers; precisa de smoke test manual com credenciais reais (ver `docs/rastreabilidade.md`)
+
+</blockquote>
+</details>
+
+</blockquote>
+</details>
+
+<details id="dir-infra-affiliates">
+<summary><strong>Affiliates/ (Fases 4–6 — pivô multi-loja)</strong></summary>
+<blockquote>
+
+<details id="PassthroughAffiliateLinkGenerator">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Affiliates/PassthroughAffiliateLinkGenerator.cs">PassthroughAffiliateLinkGenerator.cs</a> [class]</strong></summary>
+<blockquote>
+
+**implements:** [IAffiliateLinkGenerator](#IAffiliateLinkGenerator)
+
+**comportamento:** `CanHandle` sempre `true`; `GenerateAsync` devolve a URL original sem transformação — fallback universal do `AffiliateLinkResolver` enquanto uma loja não tem rede de afiliados real integrada
+
+</blockquote>
+</details>
+
+<details id="AffiliateLinkResolver">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Affiliates/AffiliateLinkResolver.cs">AffiliateLinkResolver.cs</a> [class]</strong></summary>
+<blockquote>
+
+**implements:** `IAffiliateLinkResolver`
+
+**dependências:** `IEnumerable<IAffiliateLinkGenerator>`
+
+**métodos:** `Resolve(ProductSource)`, `Resolve(url)` — diferente do `PriceFetcherResolver`, nunca lança: cai no [PassthroughAffiliateLinkGenerator](#PassthroughAffiliateLinkGenerator) se nada específico bater
+
+</blockquote>
+</details>
+
+<details id="LomadeeDeeplinkGenerator">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Affiliates/LomadeeDeeplinkGenerator.cs">LomadeeDeeplinkGenerator.cs</a> [class]</strong></summary>
+<blockquote>
+
+**implements:** [IAffiliateLinkGenerator](#IAffiliateLinkGenerator)
+
+**dependências:** `HttpClient`, `IOptions<LomadeeSettings>`, `ILogger<LomadeeDeeplinkGenerator>`
+
+**comportamento:** converte a URL do Kabum em link "lomadeezado" via `GET {baseUrl}/{appToken}/deeplink/_create?...&url=...`; nunca lança — cai no passthrough (URL original) se a chamada falhar (Fase 6)
+
+**⚠️ não validado contra a API real** — mesma ressalva do [KabumFetcher](#KabumFetcher)
 
 </blockquote>
 </details>
@@ -681,6 +1004,19 @@
 </blockquote>
 </details>
 
+<details id="BackfillWorker">
+<summary><strong><a href="../src/PriceWatch.Infrastructure/Workers/BackfillWorker.cs">BackfillWorker.cs</a> [class]</strong></summary>
+<blockquote>
+
+**extends:** `BackgroundService`
+
+**dependências:** `IServiceScopeFactory`, `ILogger<BackfillWorker>`
+
+**comportamento:** roda uma vez no startup, chama [BackfillTrackedProductsUseCase](#BackfillTrackedProductsUseCase) — idempotente (Fase 4)
+
+</blockquote>
+</details>
+
 </blockquote>
 </details>
 
@@ -692,6 +1028,8 @@
 - [JwtSettings.cs](../src/PriceWatch.Infrastructure/Settings/JwtSettings.cs) — `Secret`, `Issuer`, `Audience`, `ExpiresInHours`
 - [SmtpSettings.cs](../src/PriceWatch.Infrastructure/Settings/SmtpSettings.cs) — `Host`, `Port`, `Username`, `Password`, `FromEmail`, `FromName`
 - [RedisSettings.cs](../src/PriceWatch.Infrastructure/Settings/RedisSettings.cs) — `ConnectionString`
+- [RateLimitingSettings.cs](../src/PriceWatch.Infrastructure/Settings/RateLimitingSettings.cs) — `AnonymousPermitLimit=30`, `AuthenticatedPermitLimit=120`, `WindowSeconds=60` (Fase 3)
+- [LomadeeSettings.cs](../src/PriceWatch.Infrastructure/Settings/LomadeeSettings.cs) — `AppToken?`, `SourceId?`, `BaseUrl="https://api.lomadee.com/v2"` (Fase 6 — credenciais vazias até o dev se cadastrar como afiliado)
 
 </blockquote>
 </details>
@@ -781,6 +1119,39 @@
 </blockquote>
 </details>
 
+<details id="OffersController">
+<summary><strong><a href="../src/PriceWatch.API/Controllers/OffersController.cs">OffersController.cs</a> [class]</strong></summary>
+<blockquote>
+
+**extends:** `ControllerBase`
+
+**dependências:** [CreateOfferUseCase](#CreateOfferUseCase), [GetProductComparisonUseCase](#GetProductComparisonUseCase), [RedirectOfferUseCase](#RedirectOfferUseCase), `ILogger<OffersController>`
+
+**endpoints:** `POST /api/offers` → 201, `GET /api/products/{id}/comparison` → 200, `GET /api/offers/{id}/redirect` → 302 (loga o clique antes de redirecionar)
+
+**Fase 4/6 — pivô multi-loja.** Nota: a action de redirect chama-se `RedirectToOffer` (não `Redirect`) pra não colidir com `ControllerBase.Redirect(string)`
+
+</blockquote>
+</details>
+
+</blockquote>
+</details>
+
+<details id="dir-api-ratelimiting">
+<summary><strong>RateLimiting/ (Fase 3)</strong></summary>
+<blockquote>
+
+<details id="RateLimitPartitionSelector">
+<summary><strong><a href="../src/PriceWatch.API/RateLimiting/RateLimitPartitionSelector.cs">RateLimitPartitionSelector.cs</a> [static class]</strong></summary>
+<blockquote>
+
+**métodos:** `Select(httpContext, anonymousPermitLimit, authenticatedPermitLimit, window) → RateLimitPartition<string>`
+
+**comportamento:** autenticado → partição `user:{id}`; anônimo → partição `ip:{remoteIp}`. Extraído como método puro testável (sem precisar subir host) — usado em `Program.cs` via `AddOptions<RateLimiterOptions>().Configure<IOptions<RateLimitingSettings>>(...)`
+
+</blockquote>
+</details>
+
 </blockquote>
 </details>
 
@@ -788,13 +1159,13 @@
 <summary><strong>Extensions/</strong></summary>
 <blockquote>
 
-- [ServiceCollectionExtensions.cs](../src/PriceWatch.API/Extensions/ServiceCollectionExtensions.cs) — `AddApplicationServices()` compondo `AddMongoDb`, `AddJwtAuth`, `AddInfrastructure`, `AddUseCases`
+- [ServiceCollectionExtensions.cs](../src/PriceWatch.API/Extensions/ServiceCollectionExtensions.cs) — `AddApplicationServices()` compondo `AddMongoDb`, `AddJwtAuth` (Fase 3: fail-fast se `Jwt:Secret` vazio), `AddInfrastructure` (Fase 3: Polly retry/circuit breaker nos `AddHttpClient<...>`; Fases 4–6: DI do pivô multi-loja), `AddUseCases`
 
 </blockquote>
 </details>
 
-- [Program.cs](../src/PriceWatch.API/Program.cs) — entry point; registra `GlobalExceptionHandler`, Swagger, Controllers
-- [appsettings.json](../src/PriceWatch.API/appsettings.json)
+- [Program.cs](../src/PriceWatch.API/Program.cs) — entry point; registra `GlobalExceptionHandler`, Swagger, Controllers. **Fase 3:** Serilog (`UseSerilog`, console sink, `CorrelationId` via `LogContext`), `AddRateLimiter`/`UseRateLimiter` (usa [RateLimitPartitionSelector](#RateLimitPartitionSelector))
+- [appsettings.json](../src/PriceWatch.API/appsettings.json) — seções `Lomadee` (Fase 6) e `RateLimiting` (Fase 3) adicionadas
 - [appsettings.Development.json](../src/PriceWatch.API/appsettings.Development.json)
 
 </blockquote>
@@ -815,8 +1186,20 @@
 - [Entities/UserTests.cs](../tests/PriceWatch.UnitTests/Domain/Entities/UserTests.cs) — 7 testes: `Create`, `VerifyEmail`, `RegenerateVerificationToken`
 - [Entities/ProductListTests.cs](../tests/PriceWatch.UnitTests/Domain/Entities/ProductListTests.cs) — 3 testes: `Create_ShouldSetUserIdAndCreatedAt`, `Create_ShouldSetNameAndDescription`, `Update_ShouldChangeNameAndDescription`
 - [Entities/PriceSnapshotTests.cs](../tests/PriceWatch.UnitTests/Domain/Entities/PriceSnapshotTests.cs) — 1 teste: `Create_ShouldSetPriceAndCapturedAt`
-- [Entities/TrackedProductTests.cs](../tests/PriceWatch.UnitTests/Domain/Entities/TrackedProductTests.cs) — 9 testes: `Create`, `RecordPrice` (4 variantes), `ShouldTriggerTargetAlert` (2), `ShouldTriggerLowestAlert`, `Deactivate`
+- [Entities/TrackedProductTests.cs](../tests/PriceWatch.UnitTests/Domain/Entities/TrackedProductTests.cs) — 11 testes: `Create`, `RecordPrice` (4 variantes), `ShouldTriggerTargetAlert` (2), `ShouldTriggerLowestAlert`, `Deactivate`, `IsMigratedToProduct`/`MarkMigratedToProduct` (2, Fase 4)
 - [Exceptions/ExceptionHierarchyTests.cs](../tests/PriceWatch.UnitTests/Domain/Exceptions/ExceptionHierarchyTests.cs) — verifica hierarquia: `NotFoundException` é abstrata, `BusinessException` herda de `Exception`
+- [Entities/ProductTests.cs](../tests/PriceWatch.UnitTests/Domain/Entities/ProductTests.cs) — `Create`, `MarkAutoMatched`, `SuggestMatch`, `IsVisibleInComparison` (Theory por MatchStatus) — Fase 4/5
+- [Entities/StoreOfferTests.cs](../tests/PriceWatch.UnitTests/Domain/Entities/StoreOfferTests.cs) — `Create`, `RecordPrice` (3 variantes), `SetAffiliateUrl`, `Deactivate`, `ReassignToProduct` — Fase 4/5
+- [Entities/UserProductSubscriptionTests.cs](../tests/PriceWatch.UnitTests/Domain/Entities/UserProductSubscriptionTests.cs) — `Create`, `ShouldTriggerTargetAlert` (3), `SetTargetPrice`, `RemoveFromList`, `ReassignToProduct` — Fase 4/5
+
+</blockquote>
+</details>
+
+<details id="dir-unit-domain-services">
+<summary><strong>Domain/Services/ (Fase 5)</strong></summary>
+<blockquote>
+
+- [TitleSimilarityTests.cs](../tests/PriceWatch.UnitTests/Domain/Services/TitleSimilarityTests.cs) — 7 testes: `Normalize` (lowercase/pontuação), `Ratio` (idêntico, diferente, simétrico)
 
 </blockquote>
 </details>
@@ -867,6 +1250,19 @@
 </blockquote>
 </details>
 
+<details id="dir-unit-usecases-offers">
+<summary><strong>Application/UseCases/Offers/ (Fases 4–6 — pivô multi-loja)</strong></summary>
+<blockquote>
+
+- [CreateOfferUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/Offers/CreateOfferUseCaseTests.cs) — 6 testes: oferta nova, subscrição, reuso por (source,url), reuso de subscrição, publicação/não-publicação do evento de matching
+- [GetProductComparisonUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/Offers/GetProductComparisonUseCaseTests.cs) — 4 testes: not-found, ordenação por preço, marcação de mais barata, exclusão de ofertas inativas
+- [RedirectOfferUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/Offers/RedirectOfferUseCaseTests.cs) — 3 testes: not-found, geração+cache do link, reuso de link já cacheado
+- [BackfillTrackedProductsUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/Offers/BackfillTrackedProductsUseCaseTests.cs) — 5 testes: criação, marca migrado, pula já migrado, dedup entre 2 legados com mesma (source,url), subscrição inativa
+- [MatchStoreOfferUseCaseTests.cs](../tests/PriceWatch.UnitTests/Application/UseCases/Offers/MatchStoreOfferUseCaseTests.cs) — 9 testes: match por GTIN, GTIN sem outro produto, fuzzy só sugere (não funde), sem candidato, idempotência, offer/not-found, dedup de subscrição duplicada, reatribuição de subscrição, não rebaixa `Confirmed`
+
+</blockquote>
+</details>
+
 <details id="dir-unit-notification-domain">
 <summary><strong>Domain/Entities/ (Notification)</strong></summary>
 <blockquote>
@@ -881,6 +1277,16 @@
 <blockquote>
 
 - [PriceFetcherResolverTests.cs](../tests/PriceWatch.UnitTests/Infrastructure/Fetchers/PriceFetcherResolverTests.cs) — 2 testes: resolve ML fetcher e throw em source desconhecido
+- [KabumFetcherTests.cs](../tests/PriceWatch.UnitTests/Infrastructure/Fetchers/KabumFetcherTests.cs) — 8 testes: match exato por link, keyword extraída do slug, fallback pra primeira oferta Kabum, sem oferta/só não-Kabum/erro API/preço inválido → `BusinessException`, `CanHandle`, `ProductSource` — HTTP mockado via `Moq.Protected`, sem credenciais reais (Fase 6)
+
+</blockquote>
+</details>
+
+<details id="dir-unit-infrastructure-affiliates">
+<summary><strong>Infrastructure/Affiliates/ (Fase 6)</strong></summary>
+<blockquote>
+
+- [LomadeeDeeplinkGeneratorTests.cs](../tests/PriceWatch.UnitTests/Infrastructure/Affiliates/LomadeeDeeplinkGeneratorTests.cs) — 6 testes: sucesso, erro da API → fallback pra URL original, exceção HTTP → fallback sem lançar, resposta sem `shortUrl` → fallback, `CanHandle`, `ProductSource` — HTTP mockado, sem credenciais reais
 
 </blockquote>
 </details>
@@ -897,6 +1303,43 @@
 <blockquote>
 
 - [GlobalExceptionHandlerTests.cs](../tests/PriceWatch.IntegrationTests/Middleware/GlobalExceptionHandlerTests.cs) — verifica mapeamento 404/400/500 e corpo `ErrorResponse`
+
+</blockquote>
+</details>
+
+<details id="dir-integration-fixtures">
+<summary><strong>Fixtures/ (doc pré-pivot incompleta — só o que mudou nas Fases 3–6 listado)</strong></summary>
+<blockquote>
+
+- [FakePriceFetcher.cs](../tests/PriceWatch.IntegrationTests/Fixtures/FakePriceFetcher.cs) — substitui `IPriceFetcher` real nos testes; deriva GTIN único por URL por padrão (hash), `SetSharedGtin(url, gtin)` pra forçar colisão deliberada — ver Erros.md sobre o bug de contaminação entre testes que motivou isso (Fase 5)
+- [PriceWatchWebApplicationFactory.cs](../tests/PriceWatch.IntegrationTests/Fixtures/PriceWatchWebApplicationFactory.cs) — Fase 3: override de `RateLimiting:*Limit` alto pra não interferir na suíte; remove [ProductMatchingConsumer](#ProductMatchingConsumer) dos hosted services (Fase 5), igual já fazia com `PriceCheckWorker`/`RedisStreamConsumer`
+
+</blockquote>
+</details>
+
+<details id="dir-integration-offers">
+<summary><strong>Offers/ (Fase 4)</strong></summary>
+<blockquote>
+
+- [OfferFlowTests.cs](../tests/PriceWatch.IntegrationTests/Offers/OfferFlowTests.cs) — 7 testes: criar oferta, dedup por URL, 401 sem token, comparação not-found, comparação com destaque de mais barata, redirect 302, redirect not-found
+
+</blockquote>
+</details>
+
+<details id="dir-integration-ratelimiting">
+<summary><strong>RateLimiting/ (Fase 3)</strong></summary>
+<blockquote>
+
+- [RateLimitPartitionSelectorTests.cs](../tests/PriceWatch.IntegrationTests/RateLimiting/RateLimitPartitionSelectorTests.cs) — 3 testes: partição por IP (anônimo), partição por `user:{id}` (autenticado), rejeição acima do limite configurado. Fica no projeto de Integration (não Unit) porque referencia tipos do `PriceWatch.API`, que Unit não referencia
+
+</blockquote>
+</details>
+
+<details id="dir-integration-matching">
+<summary><strong>Matching/ (Fase 5)</strong></summary>
+<blockquote>
+
+- [MatchingFlowTests.cs](../tests/PriceWatch.IntegrationTests/Matching/MatchingFlowTests.cs) — cenário ponta a ponta com Mongo/Redis reais: duas ofertas com GTIN compartilhado (via `FakePriceFetcher.SetSharedGtin`) viram produtos separados na criação e são fundidas chamando [MatchStoreOfferUseCase](#MatchStoreOfferUseCase) direto (o consumer assíncrono está desligado nos testes) — verifica reatribuição de oferta, `AutoMatched`, dedup de subscrição duplicada, e o endpoint de comparação refletindo o merge
 
 </blockquote>
 </details>
