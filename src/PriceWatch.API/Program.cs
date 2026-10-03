@@ -27,7 +27,10 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .WriteTo.Console(
         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}"));
 
+builder.Services.AddProxyHeaders();
 builder.Services.AddControllers();
+builder.Services.AddHealthChecks()
+    .AddCheck<PriceWatch.API.Health.DependenciesHealthCheck>("dependencies", tags: new[] { "ready" });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -113,6 +116,7 @@ app.Use(async (context, next) =>
         await next();
 });
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseCors();
 app.UseAuthentication();
@@ -120,6 +124,12 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
+// liveness não toca em dependências (o orquestrador reinicia se falhar); readiness confere Mongo e Redis
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = c => c.Tags.Contains("ready")
+});
 
 // initialize MongoDB indexes before accepting requests
 using (var scope = app.Services.CreateScope())

@@ -256,6 +256,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ChangePasswordUseCase>();
         services.AddScoped<ChangeEmailUseCase>();
         services.AddScoped<DeleteAccountUseCase>();
+        services.AddScoped<ExportUserDataUseCase>();
 
         // Offers (pivô multi-loja)
         services.AddScoped<CreateOfferUseCase>();

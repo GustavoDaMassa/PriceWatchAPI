@@ -6,5 +6,6 @@ public interface IClickLogRepository
 {
     Task CreateAsync(ClickLog click);
     Task<long> CountByOfferIdAsync(string offerId);
+    Task<IEnumerable<ClickLog>> GetByUserIdAsync(string userId);
     Task DeleteByUserIdAsync(string userId);
 }

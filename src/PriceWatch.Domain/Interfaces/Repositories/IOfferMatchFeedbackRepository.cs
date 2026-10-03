@@ -10,6 +10,8 @@ public interface IOfferMatchFeedbackRepository
     /// <summary>Quantos usuários distintos disseram "é o mesmo produto" e querem acompanhar a candidata.</summary>
     Task<int> CountTrackVotesAsync(string candidateId);
 
+    Task<IEnumerable<OfferMatchFeedback>> GetByUserIdAsync(string userId);
+
     /// <summary>Insere ou atualiza pelo id.</summary>
     Task SaveAsync(OfferMatchFeedback feedback);
 
