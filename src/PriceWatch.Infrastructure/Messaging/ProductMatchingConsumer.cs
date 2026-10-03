@@ -2,8 +2,10 @@ using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using PriceWatch.Application.DTOs.Offer;
 using PriceWatch.Application.UseCases.Offers;
+using PriceWatch.Infrastructure.Settings;
 using StackExchange.Redis;
 
 namespace PriceWatch.Infrastructure.Messaging;
@@ -12,6 +14,7 @@ public class ProductMatchingConsumer : BackgroundService
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly FeatureFlags _flags;
     private readonly ILogger<ProductMatchingConsumer> _logger;
     private const string StreamKey = "store-offer-events";
     private const string GroupName = "matching-group";
@@ -20,15 +23,23 @@ public class ProductMatchingConsumer : BackgroundService
     public ProductMatchingConsumer(
         IConnectionMultiplexer redis,
         IServiceScopeFactory scopeFactory,
+        IOptions<FeatureFlags> flags,
         ILogger<ProductMatchingConsumer> logger)
     {
         _redis = redis;
         _scopeFactory = scopeFactory;
+        _flags = flags.Value;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!_flags.MatchingEnabled)
+        {
+            _logger.LogInformation("Product matching disabled (Features:MatchingEnabled=false); consumer idle.");
+            return;
+        }
+
         var db = _redis.GetDatabase();
 
         try

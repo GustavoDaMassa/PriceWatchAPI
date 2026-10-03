@@ -145,6 +145,7 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<RedisStreamConsumer>();
 
         // Pivô multi-loja: Product / StoreOffer / UserProductSubscription
+        services.Configure<FeatureFlags>(configuration.GetSection("Features"));
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IStoreOfferRepository, StoreOfferRepository>();
         services.AddScoped<IUserProductSubscriptionRepository, UserProductSubscriptionRepository>();
