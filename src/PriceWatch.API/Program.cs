@@ -6,6 +6,7 @@ using PriceWatch.API.Middleware;
 using PriceWatch.API.RateLimiting;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Infrastructure.Settings;
+using Serilog;
 
 var localEnvPath = Path.Combine(Directory.GetCurrentDirectory(), "local.env");
 if (File.Exists(localEnvPath))
@@ -17,6 +18,14 @@ if (File.Exists(localEnvPath))
     }
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", "PriceWatch.API")
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}"));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -97,6 +106,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.Use(async (context, next) =>
+{
+    using (Serilog.Context.LogContext.PushProperty("CorrelationId", context.TraceIdentifier))
+        await next();
+});
 
 app.UseExceptionHandler();
 app.UseCors();
