@@ -1,8 +1,11 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
+using Polly;
+using Polly.Extensions.Http;
 using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
@@ -108,14 +111,18 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITrackedProductRepository, TrackedProductRepository>();
         services.AddScoped<IPriceSnapshotRepository, PriceSnapshotRepository>();
         services.Configure<MercadoLivreSettings>(configuration.GetSection("MercadoLivre"));
-        services.AddHttpClient<MercadoLivreTokenService>();
+        services.AddHttpClient<MercadoLivreTokenService>()
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
         services.AddSingleton<MercadoLivreTokenService>();
         services.AddScoped<IPriceFetcher, MercadoLivreFetcher>();
         services.AddScoped<IPriceFetcherResolver, PriceFetcherResolver>();
         services.AddHttpClient<MercadoLivreFetcher>(client =>
         {
             client.DefaultRequestHeaders.Add("User-Agent", "PriceWatchAPI/1.0");
-        });
+        })
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
         services.AddHostedService<PriceCheckWorker>();
 
         // Notification
@@ -168,4 +175,14 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
+        HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+    private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
+        HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
 }
