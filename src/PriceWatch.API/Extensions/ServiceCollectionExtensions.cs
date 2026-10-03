@@ -9,6 +9,7 @@ using Polly.Extensions.Http;
 using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
 using PriceWatch.Application.UseCases.Catalog;
+using PriceWatch.Application.UseCases.Devices;
 using PriceWatch.Application.UseCases.Discovery;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
@@ -158,6 +159,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserProductSubscriptionRepository, UserProductSubscriptionRepository>();
         services.AddScoped<IClickLogRepository, ClickLogRepository>();
         services.AddScoped<IOfferCandidateRepository, OfferCandidateRepository>();
+        services.AddScoped<IDeviceTokenRepository, DeviceTokenRepository>();
         services.AddScoped<IOfferMatchFeedbackRepository, OfferMatchFeedbackRepository>();
         services.AddHostedService<BackfillWorker>();
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
@@ -256,6 +258,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<CheckOfferPriceUseCase>();
         services.AddScoped<GetSupportedStoresUseCase>();
         services.AddScoped<DiscoverOffersUseCase>();
+        services.AddScoped<RegisterDeviceUseCase>();
+        services.AddScoped<UnregisterDeviceUseCase>();
         services.AddScoped<GetOfferCandidatesUseCase>();
         services.AddScoped<ConfirmOfferMatchUseCase>();
         services.AddScoped<LegacyProductCatalogFacade>();
