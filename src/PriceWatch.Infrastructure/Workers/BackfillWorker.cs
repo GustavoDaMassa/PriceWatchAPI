@@ -31,9 +31,9 @@ public class BackfillWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_flags.BackfillEnabled)
+        if (!_flags.BackfillActive)
         {
-            _logger.LogInformation("Backfill disabled (Features:BackfillEnabled=false); skipping.");
+            _logger.LogInformation("Backfill disabled (Features:BackfillEnabled=false and UnifiedCatalogEnabled=false); skipping.");
             return;
         }
 

@@ -2,7 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PriceWatch.Application.DTOs.TrackedProduct;
-using PriceWatch.Application.UseCases.TrackedProduct;
+using PriceWatch.Application.UseCases.Catalog;
 using PriceWatch.Domain.Exceptions;
 
 namespace PriceWatch.API.Controllers;
@@ -14,27 +14,11 @@ namespace PriceWatch.API.Controllers;
 [Produces("application/json")]
 public class ProductsController : ControllerBase
 {
-    private readonly GetUserProductsUseCase _getProducts;
-    private readonly AddProductUseCase _addProduct;
-    private readonly UpdateProductUseCase _updateProduct;
-    private readonly AssignProductToListUseCase _assignToList;
-    private readonly RemoveProductUseCase _removeProduct;
-    private readonly GetPriceHistoryUseCase _getPriceHistory;
+    private readonly IProductCatalogFacade _catalog;
 
-    public ProductsController(
-        GetUserProductsUseCase getProducts,
-        AddProductUseCase addProduct,
-        UpdateProductUseCase updateProduct,
-        AssignProductToListUseCase assignToList,
-        RemoveProductUseCase removeProduct,
-        GetPriceHistoryUseCase getPriceHistory)
+    public ProductsController(IProductCatalogFacade catalog)
     {
-        _getProducts = getProducts;
-        _addProduct = addProduct;
-        _updateProduct = updateProduct;
-        _assignToList = assignToList;
-        _removeProduct = removeProduct;
-        _getPriceHistory = getPriceHistory;
+        _catalog = catalog;
     }
 
     /// <summary>Retorna todos os produtos monitorados do usuário, opcionalmente filtrados por lista.</summary>
@@ -44,7 +28,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(typeof(IEnumerable<TrackedProductResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProducts([FromQuery] string? listId = null)
     {
-        var result = await _getProducts.ExecuteAsync(GetUserId(), listId);
+        var result = await _catalog.GetUserProductsAsync(GetUserId(), listId);
         return Ok(result);
     }
 
@@ -61,7 +45,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> AddProduct([FromBody] AddProductRequest request)
     {
-        var result = await _addProduct.ExecuteAsync(GetUserId(), request);
+        var result = await _catalog.AddProductAsync(GetUserId(), request);
         return StatusCode(201, result);
     }
 
@@ -74,7 +58,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateProduct(string id, [FromBody] UpdateProductRequest request)
     {
-        await _updateProduct.ExecuteAsync(id, GetUserId(), request);
+        await _catalog.UpdateProductAsync(id, GetUserId(), request);
         return NoContent();
     }
 
@@ -88,7 +72,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AssignToList(string id, [FromBody] AssignToListRequest request)
     {
-        await _assignToList.ExecuteAsync(id, GetUserId(), request);
+        await _catalog.AssignToListAsync(id, GetUserId(), request);
         return NoContent();
     }
 
@@ -101,7 +85,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveProduct(string id)
     {
-        await _removeProduct.ExecuteAsync(id, GetUserId());
+        await _catalog.RemoveProductAsync(id, GetUserId());
         return NoContent();
     }
 
@@ -114,7 +98,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPriceHistory(string id)
     {
-        var result = await _getPriceHistory.ExecuteAsync(id, GetUserId());
+        var result = await _catalog.GetPriceHistoryAsync(id, GetUserId());
         return Ok(result);
     }
 

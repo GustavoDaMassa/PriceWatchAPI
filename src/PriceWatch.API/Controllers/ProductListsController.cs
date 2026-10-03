@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PriceWatch.Application.DTOs.ProductList;
+using PriceWatch.Application.UseCases.Catalog;
 using PriceWatch.Application.UseCases.ProductList;
 using PriceWatch.Domain.Exceptions;
 
@@ -18,20 +19,20 @@ public class ProductListsController : ControllerBase
     private readonly CreateListUseCase _createList;
     private readonly UpdateListUseCase _updateList;
     private readonly DeleteListUseCase _deleteList;
-    private readonly GetListAnalysisUseCase _getListAnalysis;
+    private readonly IProductCatalogFacade _catalog;
 
     public ProductListsController(
         GetUserListsUseCase getUserLists,
         CreateListUseCase createList,
         UpdateListUseCase updateList,
         DeleteListUseCase deleteList,
-        GetListAnalysisUseCase getListAnalysis)
+        IProductCatalogFacade catalog)
     {
         _getUserLists = getUserLists;
         _createList = createList;
         _updateList = updateList;
         _deleteList = deleteList;
-        _getListAnalysis = getListAnalysis;
+        _catalog = catalog;
     }
 
     /// <summary>Retorna todas as listas do usuário autenticado.</summary>
@@ -95,7 +96,7 @@ public class ProductListsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetListAnalysis(string id)
     {
-        var result = await _getListAnalysis.ExecuteAsync(id, GetUserId());
+        var result = await _catalog.GetListAnalysisAsync(id, GetUserId());
         return Ok(result);
     }
 

@@ -24,11 +24,12 @@ public class StoreOffer
         string productId,
         ProductSource source,
         string url,
-        string? gtin = null)
+        string? gtin = null,
+        string? id = null)
     {
         return new StoreOffer
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = id ?? Guid.NewGuid().ToString(),
             ProductId = productId,
             Source = source,
             Url = url,
@@ -88,6 +89,17 @@ public class StoreOffer
         NextCheckAt = DateTime.UtcNow.AddHours(CheckIntervalHours);
 
         return PriceSnapshot.Create(Id, price);
+    }
+
+    // adia a próxima checagem sem alterar preços — usado quando a loja falha, para não
+    // bater na API externa a cada ciclo do worker
+    public void PostponeCheck(TimeSpan delay) => NextCheckAt = DateTime.UtcNow.Add(delay);
+
+    // usado pelo backfill: preserva o menor preço histórico do TrackedProduct legado
+    public void RestoreLowestPrice(decimal historicLowest)
+    {
+        if (historicLowest > 0 && (LowestPrice == 0m || historicLowest < LowestPrice))
+            LowestPrice = historicLowest;
     }
 
     public void SetAffiliateUrl(string affiliateUrl) => AffiliateUrl = affiliateUrl;

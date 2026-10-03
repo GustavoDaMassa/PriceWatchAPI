@@ -37,7 +37,8 @@ public class CreateOfferUseCaseTests
             .ReturnsAsync((UserProductSubscription?)null);
 
         _useCase = new CreateOfferUseCase(
-            _products.Object, _offers.Object, _subscriptions.Object, _resolver.Object, _matchingEventPublisher.Object);
+            _products.Object, _offers.Object, _subscriptions.Object, _resolver.Object, _matchingEventPublisher.Object,
+            new SyncOfferActivityUseCase(_offers.Object, _subscriptions.Object));
     }
 
     [Fact]
@@ -133,5 +134,32 @@ public class CreateOfferUseCaseTests
         result.TargetPrice.Should().Be(90m);
         _subscriptions.Verify(r => r.CreateAsync(It.IsAny<UserProductSubscription>()), Times.Never);
         _subscriptions.Verify(r => r.UpdateAsync(It.Is<UserProductSubscription>(s => s.TargetPrice == 90m)), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ShouldReturnTheSubscriptionListId()
+    {
+        var result = await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 100m, "list-1"));
+
+        result.ListId.Should().Be("list-1");
+    }
+
+    [Fact]
+    public async Task Execute_WhenAnInactiveOfferGetsANewSubscriber_ReactivatesTheOffer()
+    {
+        var existingProduct = Product.Create("iPhone 15 128GB");
+        var inactiveOffer = StoreOffer.Create(existingProduct.Id, ProductSource.MercadoLivre, MercadoLivreUrl);
+        inactiveOffer.Deactivate();
+
+        _offers.Setup(r => r.GetBySourceAndUrlAsync(ProductSource.MercadoLivre, MercadoLivreUrl)).ReturnsAsync(inactiveOffer);
+        _offers.Setup(r => r.GetByProductIdAsync(existingProduct.Id)).ReturnsAsync(new[] { inactiveOffer });
+        _products.Setup(r => r.GetByIdAsync(existingProduct.Id)).ReturnsAsync(existingProduct);
+        _subscriptions.Setup(r => r.GetByProductIdAsync(existingProduct.Id))
+            .ReturnsAsync(new[] { UserProductSubscription.Create("user-1", existingProduct.Id, 90m) });
+
+        await _useCase.ExecuteAsync("user-1", new CreateOfferRequest(MercadoLivreUrl, 90m));
+
+        inactiveOffer.IsActive.Should().BeTrue();
+        _offers.Verify(r => r.UpdateAsync(inactiveOffer), Times.Once);
     }
 }

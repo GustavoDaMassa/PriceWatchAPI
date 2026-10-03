@@ -17,11 +17,12 @@ public class UserProductSubscription
         string userId,
         string productId,
         decimal targetPrice,
-        string? listId = null)
+        string? listId = null,
+        string? id = null)
     {
         return new UserProductSubscription
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = id ?? Guid.NewGuid().ToString(),
             UserId = userId,
             ProductId = productId,
             ListId = listId,
@@ -70,6 +71,14 @@ public class UserProductSubscription
         TargetPrice > 0 && currentPrice <= TargetPrice && !TargetAlertSent;
 
     public void MarkTargetAlertSent() => TargetAlertSent = true;
+
+    // mesmo comportamento do TrackedProduct.RecordPrice: quando o preço volta a ficar acima do
+    // alvo, o alerta de preço-alvo pode disparar de novo na próxima queda
+    public void ResetTargetAlertIfAbove(decimal currentPrice)
+    {
+        if (TargetPrice > 0 && currentPrice > TargetPrice)
+            TargetAlertSent = false;
+    }
 
     // usado pelo motor de matching (Fase 5) ao unificar produtos — ver MatchStoreOfferUseCase
     public void ReassignToProduct(string productId) => ProductId = productId;

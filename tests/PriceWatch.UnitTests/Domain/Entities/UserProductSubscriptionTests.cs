@@ -77,4 +77,28 @@ public class UserProductSubscriptionTests
 
         subscription.ProductId.Should().Be("product-2");
     }
+
+    [Fact]
+    public void Create_WithExplicitId_ShouldUseIt()
+    {
+        var subscription = UserProductSubscription.Create("user-1", "product-1", 100m, id: "legacy-id");
+
+        subscription.Id.Should().Be("legacy-id");
+    }
+
+    [Theory]
+    [InlineData(100, 120, false)]
+    [InlineData(100, 100, true)]
+    [InlineData(100, 80, true)]
+    [InlineData(0, 120, true)]
+    public void ResetTargetAlertIfAbove_ShouldOnlyResetWhenPriceIsAboveAPositiveTarget(
+        decimal target, decimal price, bool expectedStillSent)
+    {
+        var subscription = CreateSubscription(target);
+        subscription.MarkTargetAlertSent();
+
+        subscription.ResetTargetAlertIfAbove(price);
+
+        subscription.TargetAlertSent.Should().Be(expectedStillSent);
+    }
 }

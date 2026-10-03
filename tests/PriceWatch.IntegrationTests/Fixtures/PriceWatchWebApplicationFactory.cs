@@ -71,6 +71,7 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
             var workers = services
                 .Where(d => d.ServiceType == typeof(IHostedService) &&
                            (d.ImplementationType == typeof(PriceCheckWorker) ||
+                            d.ImplementationType == typeof(StoreOfferPriceCheckWorker) ||
                             d.ImplementationType == typeof(RedisStreamConsumer) ||
                             d.ImplementationType == typeof(ProductMatchingConsumer)))
                 .ToList();

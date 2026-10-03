@@ -62,6 +62,11 @@ public class UserProductSubscriptionRepository : IUserProductSubscriptionReposit
         await _collection.DeleteOneAsync(d => d.Id == id);
     }
 
+    public async Task DeleteByUserIdAsync(string userId)
+    {
+        await _collection.DeleteManyAsync(d => d.UserId == userId);
+    }
+
     public async Task UnlinkByListIdAsync(string listId)
     {
         var update = Builders<UserProductSubscriptionDocument>.Update.Set(d => d.ListId, (string?)null);

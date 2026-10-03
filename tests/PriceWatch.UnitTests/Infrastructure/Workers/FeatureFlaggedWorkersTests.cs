@@ -57,4 +57,34 @@ public class FeatureFlaggedWorkersTests
 
         redis.Verify(r => r.GetDatabase(It.IsAny<int>(), It.IsAny<object>()), Times.Never);
     }
+
+    [Fact]
+    public async Task StoreOfferPriceCheckWorker_WhenUnifiedCatalogIsDisabled_StaysIdle()
+    {
+        var scopeFactory = new Mock<IServiceScopeFactory>();
+        var worker = new StoreOfferPriceCheckWorker(
+            scopeFactory.Object,
+            Options.Create(new FeatureFlags { UnifiedCatalogEnabled = false }),
+            NullLogger<StoreOfferPriceCheckWorker>.Instance);
+
+        await worker.StartAsync(CancellationToken.None);
+        await worker.ExecuteTask!;
+
+        scopeFactory.Verify(f => f.CreateScope(), Times.Never);
+    }
+
+    [Fact]
+    public async Task PriceCheckWorker_WhenUnifiedCatalogIsEnabled_StaysIdle()
+    {
+        var scopeFactory = new Mock<IServiceScopeFactory>();
+        var worker = new PriceCheckWorker(
+            scopeFactory.Object,
+            Options.Create(new FeatureFlags { UnifiedCatalogEnabled = true }),
+            NullLogger<PriceCheckWorker>.Instance);
+
+        await worker.StartAsync(CancellationToken.None);
+        await worker.ExecuteTask!;
+
+        scopeFactory.Verify(f => f.CreateScope(), Times.Never);
+    }
 }

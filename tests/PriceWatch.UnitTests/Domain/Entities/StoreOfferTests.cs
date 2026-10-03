@@ -89,4 +89,39 @@ public class StoreOfferTests
 
         offer.ProductId.Should().Be("product-2");
     }
+
+    [Fact]
+    public void Create_WithExplicitId_ShouldUseIt()
+    {
+        var offer = StoreOffer.Create("product-1", ProductSource.MercadoLivre, "http://example.com/item", id: "legacy-id");
+
+        offer.Id.Should().Be("legacy-id");
+    }
+
+    [Fact]
+    public void PostponeCheck_ShouldMoveNextCheckAtForwardWithoutTouchingPrices()
+    {
+        var offer = CreateOffer();
+        offer.RecordPrice(100m);
+
+        offer.PostponeCheck(TimeSpan.FromMinutes(15));
+
+        offer.NextCheckAt.Should().BeCloseTo(DateTime.UtcNow.AddMinutes(15), TimeSpan.FromSeconds(5));
+        offer.CurrentPrice.Should().Be(100m);
+    }
+
+    [Theory]
+    [InlineData(0, 80, 80)]
+    [InlineData(100, 80, 80)]
+    [InlineData(100, 120, 100)]
+    [InlineData(100, 0, 100)]
+    public void RestoreLowestPrice_ShouldKeepTheMinimumPositiveValue(decimal current, decimal historic, decimal expected)
+    {
+        var offer = CreateOffer();
+        if (current > 0) offer.RecordPrice(current);
+
+        offer.RestoreLowestPrice(historic);
+
+        offer.LowestPrice.Should().Be(expected);
+    }
 }

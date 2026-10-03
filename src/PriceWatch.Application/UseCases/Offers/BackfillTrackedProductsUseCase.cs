@@ -11,6 +11,12 @@ namespace PriceWatch.Application.UseCases.Offers;
 /// modelo novo (<see cref="Product"/> compartilhado + <see cref="StoreOffer"/> por loja +
 /// <see cref="UserProductSubscription"/> por usuário). Não remove nem altera o TrackedProduct
 /// legado — só marca cada um como migrado. Ver docs/arquitetura.md, seção "Pivô Multi-Loja".
+///
+/// Preserva os ids legados para o cutover não quebrar clientes: a assinatura recebe o id do
+/// TrackedProduct (os links da SPA e as notificações continuam válidos) e, quando é a primeira a
+/// criar a oferta, a oferta também (o histórico em price_snapshots é chaveado por esse id). Itens
+/// processados do mais antigo para o mais novo: se vários usuários acompanham a mesma URL, a oferta
+/// compartilhada herda o histórico mais longo.
 /// </summary>
 public class BackfillTrackedProductsUseCase
 {
@@ -36,7 +42,7 @@ public class BackfillTrackedProductsUseCase
 
     public async Task<int> ExecuteAsync()
     {
-        var legacyProducts = await _trackedProducts.GetAllAsync();
+        var legacyProducts = (await _trackedProducts.GetAllAsync()).OrderBy(p => p.CreatedAt).ToList();
         var migratedCount = 0;
 
         foreach (var legacy in legacyProducts)
@@ -64,16 +70,25 @@ public class BackfillTrackedProductsUseCase
         {
             var existingProduct = await _products.GetByIdAsync(existingOffer.ProductId)
                 ?? throw new ProductNotFoundException(existingOffer.ProductId);
+
+            // a oferta compartilhada só fica pausada se todos os itens legados estiverem pausados
+            if (legacy.IsActive && !existingOffer.IsActive)
+            {
+                existingOffer.Activate();
+                await _offers.UpdateAsync(existingOffer);
+            }
+
             return (existingProduct, existingOffer);
         }
 
         var product = Product.Create(legacy.Name, imageUrl: legacy.ImageUrl);
         await _products.CreateAsync(product);
 
-        var offer = StoreOffer.Create(product.Id, legacy.Source, legacy.Url);
-        // espelha o snapshot atual — o offer só passa a ser verificado de fato por um worker
-        // próprio quando o ciclo operacional do pivô assumir esse papel (Fase 6)
+        var offer = StoreOffer.Create(product.Id, legacy.Source, legacy.Url, id: legacy.Id);
+        // espelha o estado atual do item legado; quem passa a verificar o preço é o
+        // StoreOfferPriceCheckWorker (Features:UnifiedCatalogEnabled)
         offer.RecordPrice(legacy.CurrentPrice);
+        offer.RestoreLowestPrice(legacy.LowestPrice);
         if (!legacy.IsActive)
             offer.Deactivate();
         await _offers.CreateAsync(offer);
@@ -91,9 +106,14 @@ public class BackfillTrackedProductsUseCase
         if (subscription is not null)
             return;
 
-        subscription = UserProductSubscription.Create(legacy.UserId, productId, legacy.TargetPrice, legacy.ListId);
+        subscription = UserProductSubscription.Create(
+            legacy.UserId, productId, legacy.TargetPrice, legacy.ListId, id: legacy.Id);
         if (!legacy.IsActive)
             subscription.Deactivate();
+
+        // quem já recebeu o alerta de preço-alvo não é alertado de novo logo após o cutover
+        if (legacy.TargetAlertSent)
+            subscription.MarkTargetAlertSent();
 
         await _subscriptions.CreateAsync(subscription);
     }

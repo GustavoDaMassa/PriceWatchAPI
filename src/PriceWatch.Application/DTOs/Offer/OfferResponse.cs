@@ -14,4 +14,5 @@ public record OfferResponse(
     decimal CurrentPrice,
     decimal LowestPrice,
     bool IsActive,
-    DateTime NextCheckAt);
+    DateTime NextCheckAt,
+    string? ListId = null);

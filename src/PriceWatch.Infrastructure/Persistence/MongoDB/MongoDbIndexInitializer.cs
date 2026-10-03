@@ -146,5 +146,10 @@ public class MongoDbIndexInitializer
         await col.Indexes.CreateOneAsync(new CreateIndexModel<UserProductSubscriptionDocument>(
             Builders<UserProductSubscriptionDocument>.IndexKeys.Ascending(s => s.ListId),
             new CreateIndexOptions { Name = "idx_subscriptions_listId" }));
+
+        // o worker de ofertas carrega os assinantes de um produto a cada checagem
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<UserProductSubscriptionDocument>(
+            Builders<UserProductSubscriptionDocument>.IndexKeys.Ascending(s => s.ProductId),
+            new CreateIndexOptions { Name = "idx_subscriptions_productId" }));
     }
 }

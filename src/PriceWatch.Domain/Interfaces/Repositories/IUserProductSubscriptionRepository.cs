@@ -11,5 +11,6 @@ public interface IUserProductSubscriptionRepository
     Task CreateAsync(UserProductSubscription subscription);
     Task UpdateAsync(UserProductSubscription subscription);
     Task DeleteAsync(string id);
+    Task DeleteByUserIdAsync(string userId);
     Task UnlinkByListIdAsync(string listId);
 }

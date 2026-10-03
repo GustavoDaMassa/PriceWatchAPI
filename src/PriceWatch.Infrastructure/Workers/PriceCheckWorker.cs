@@ -1,25 +1,39 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using PriceWatch.Domain.Enums;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
+using PriceWatch.Infrastructure.Settings;
 
 namespace PriceWatch.Infrastructure.Workers;
 
 public class PriceCheckWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly FeatureFlags _flags;
     private readonly ILogger<PriceCheckWorker> _logger;
 
-    public PriceCheckWorker(IServiceScopeFactory scopeFactory, ILogger<PriceCheckWorker> logger)
+    public PriceCheckWorker(
+        IServiceScopeFactory scopeFactory,
+        IOptions<FeatureFlags> flags,
+        ILogger<PriceCheckWorker> logger)
     {
         _scopeFactory = scopeFactory;
+        _flags = flags.Value;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // no catálogo unificado quem monitora é o StoreOfferPriceCheckWorker
+        if (_flags.UnifiedCatalogEnabled)
+        {
+            _logger.LogInformation("Legacy price check disabled (Features:UnifiedCatalogEnabled=true); worker idle.");
+            return;
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try

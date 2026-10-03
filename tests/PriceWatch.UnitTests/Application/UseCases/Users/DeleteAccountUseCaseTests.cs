@@ -1,6 +1,8 @@
 using FluentAssertions;
 using Moq;
+using PriceWatch.Application.UseCases.Offers;
 using PriceWatch.Application.UseCases.Users;
+using PriceWatch.Domain.Entities;
 using PriceWatch.Domain.Exceptions;
 using PriceWatch.Domain.Interfaces.Repositories;
 using PriceWatch.Domain.Interfaces.Services;
@@ -18,6 +20,8 @@ public class DeleteAccountUseCaseTests
     private readonly Mock<ITrackedProductRepository> _productRepo = new();
     private readonly Mock<IPriceSnapshotRepository> _snapshotRepo = new();
     private readonly Mock<INotificationRepository> _notifRepo = new();
+    private readonly Mock<IUserProductSubscriptionRepository> _subscriptionRepo = new();
+    private readonly Mock<IStoreOfferRepository> _offerRepo = new();
     private readonly DeleteAccountUseCase _useCase;
 
     public DeleteAccountUseCaseTests()
@@ -28,7 +32,9 @@ public class DeleteAccountUseCaseTests
             _listRepo.Object,
             _productRepo.Object,
             _snapshotRepo.Object,
-            _notifRepo.Object);
+            _notifRepo.Object,
+            _subscriptionRepo.Object,
+            new SyncOfferActivityUseCase(_offerRepo.Object, _subscriptionRepo.Object));
     }
 
     [Fact]
@@ -62,5 +68,26 @@ public class DeleteAccountUseCaseTests
         var act = async () => await _useCase.ExecuteAsync(user.Id, "wrong");
 
         await act.Should().ThrowAsync<BusinessException>().WithMessage("*incorrect*");
+    }
+
+    [Fact]
+    public async Task Execute_ShouldDeleteTheUsersCatalogSubscriptionsAndPauseOffersWithoutSubscribers()
+    {
+        var user = DomainUser.Create("A", "a@test.com", "hash", "tok");
+        var subscription = UserProductSubscription.Create(user.Id, "product-1", 100m);
+        var offer = StoreOffer.Create("product-1", PriceWatch.Domain.Enums.ProductSource.MercadoLivre, "https://ml/a");
+
+        _userRepo.Setup(r => r.GetByIdAsync(user.Id)).ReturnsAsync(user);
+        _hasher.Setup(h => h.Verify("Pass123", "hash")).Returns(true);
+        _productRepo.Setup(r => r.GetByUserIdAsync(user.Id, null)).ReturnsAsync(new List<DomainTrackedProduct>());
+        _subscriptionRepo.Setup(r => r.GetByUserIdAsync(user.Id, null)).ReturnsAsync(new[] { subscription });
+        _subscriptionRepo.Setup(r => r.GetByProductIdAsync("product-1")).ReturnsAsync(Array.Empty<UserProductSubscription>());
+        _offerRepo.Setup(r => r.GetByProductIdAsync("product-1")).ReturnsAsync(new[] { offer });
+
+        await _useCase.ExecuteAsync(user.Id, "Pass123");
+
+        _subscriptionRepo.Verify(r => r.DeleteByUserIdAsync(user.Id), Times.Once);
+        offer.IsActive.Should().BeFalse();
+        _offerRepo.Verify(r => r.UpdateAsync(offer), Times.Once);
     }
 }

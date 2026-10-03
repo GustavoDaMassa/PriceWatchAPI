@@ -36,6 +36,16 @@ public class StoreOfferRepository : IStoreOfferRepository
         return docs.Select(StoreOfferMappings.ToDomain);
     }
 
+    public async Task<IEnumerable<StoreOffer>> GetByProductIdsAsync(IEnumerable<string> productIds)
+    {
+        var idList = productIds.Distinct().ToList();
+        if (idList.Count == 0)
+            return Enumerable.Empty<StoreOffer>();
+
+        var docs = await _collection.Find(d => idList.Contains(d.ProductId)).ToListAsync();
+        return docs.Select(StoreOfferMappings.ToDomain);
+    }
+
     public async Task<IEnumerable<StoreOffer>> GetDueForCheckAsync()
     {
         var now = DateTime.UtcNow;
