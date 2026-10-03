@@ -114,3 +114,41 @@ Pegar 30 produtos reais (mix de eletrônicos e moda) e medir, por loja, quantos 
 - Prepara scripts de teste a partir do item 2 quando as credenciais saírem e roda junto com você, sem exibir segredos.
 - Preenche a tabela do item 1 com as respostas reais e atualiza `arquitetura.md` e `requisitos.md` com o que cada rede suporta.
 - Ajusta `KabumFetcher.cs`/`LomadeeDeeplinkGenerator.cs` se o formato real divergir, e cria o `AwinLinkGenerator` se a Awin for aprovada.
+
+## 9. Firebase (push) e Amazon SES (e-mail): guia passo a passo
+
+O código já está pronto e testado com simulações; falta só você criar as contas e me passar o resultado **sem colar chaves aqui** (guarde em variáveis de ambiente).
+
+### 9.1 Firebase Cloud Messaging (push no Android)
+
+1. Acesse `console.firebase.google.com`, **Adicionar projeto** (ex.: "PriceWatch"). Pode desativar o Google Analytics.
+2. Em **Configurações do projeto → Contas de serviço → Gerar nova chave privada**: baixa um arquivo `.json`. **É um segredo**: não commite, não envie por chat.
+3. Anote o **ID do projeto** (`project_id` dentro do JSON, também em Configurações do projeto).
+4. Converta o JSON em uma linha base64 para o `.env` do servidor:
+   ```bash
+   base64 -w0 caminho/para/chave-de-servico.json
+   ```
+5. No `.env` do servidor (`~/servidor/pricewatch/.env`):
+   ```
+   FCM_PROJECT_ID=<id do projeto>
+   FCM_SERVICE_ACCOUNT_JSON_BASE64=<saída do comando acima>
+   ```
+   e recrie a API: `docker compose -f docker-compose.prod.yml up -d pricewatch-api`.
+6. Para o app Android (marco M7) você também vai registrar o app Android no mesmo projeto e baixar o `google-services.json`; isso será guiado quando chegarmos lá.
+
+### 9.2 Amazon SES (e-mail)
+
+1. Na AWS, abra o **SES** na região `sa-east-1` (São Paulo) e, em **Identidades verificadas**, crie uma identidade de **domínio** (ex.: `gustavohdev.com.br`).
+2. O SES mostra registros **DKIM** (3 CNAMEs). Cadastre-os no DNS da Cloudflare (modo "somente DNS", nuvem cinza). Adicione também um registro **SPF** (`v=spf1 include:amazonses.com ~all`) e, se ainda não tiver, um **DMARC** simples.
+3. Aguarde a identidade ficar "Verificada". Em **Configurações da conta → Acesso ao sandbox**, peça a **saída do sandbox** (sem isso o SES só envia para endereços verificados).
+4. Em **SMTP settings → Criar credenciais SMTP**: guarda usuário e senha SMTP (diferentes das chaves de acesso da AWS).
+5. No `.env` do servidor:
+   ```
+   SMTP_HOST=email-smtp.sa-east-1.amazonaws.com
+   SMTP_PORT=587
+   SMTP_USER=<usuário SMTP>
+   SMTP_PASSWORD=<senha SMTP>
+   SMTP_FROM=PriceWatch <alertas@gustavohdev.com.br>
+   ```
+   (`SMTP_FRONTEND_BASE_URL` continua apontando para o endereço da SPA.)
+6. Teste: crie uma conta nova pela SPA e confira se o e-mail de verificação chega; veja `docker compose logs pricewatch-api` se não chegar.

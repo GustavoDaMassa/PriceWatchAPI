@@ -36,6 +36,8 @@ services:
       MercadoLivre__ClientSecret: ${MERCADOLIVRE_CLIENT_SECRET}
       Lomadee__AppToken: ${LOMADEE_APP_TOKEN:-}
       Lomadee__SourceId: ${LOMADEE_SOURCE_ID:-}
+      Fcm__ProjectId: ${FCM_PROJECT_ID:-}
+      Fcm__ServiceAccountJsonBase64: ${FCM_SERVICE_ACCOUNT_JSON_BASE64:-}
       Features__BackfillEnabled: ${FEATURE_BACKFILL_ENABLED:-false}
       Features__MatchingEnabled: ${FEATURE_MATCHING_ENABLED:-false}
       Features__UnifiedCatalogEnabled: ${FEATURE_UNIFIED_CATALOG_ENABLED:-false}

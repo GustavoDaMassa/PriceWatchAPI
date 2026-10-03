@@ -9,6 +9,7 @@ using Polly.Extensions.Http;
 using PriceWatch.Application.Interfaces;
 using PriceWatch.Application.UseCases.Auth;
 using PriceWatch.Application.UseCases.Catalog;
+using PriceWatch.Application.UseCases.Devices;
 using PriceWatch.Application.UseCases.Discovery;
 using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
@@ -25,6 +26,7 @@ using PriceWatch.Infrastructure.Fetchers;
 using PriceWatch.Infrastructure.Messaging;
 using PriceWatch.Infrastructure.Network;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Repositories;
+using PriceWatch.Infrastructure.Push;
 using PriceWatch.Infrastructure.Search;
 using PriceWatch.Infrastructure.Security;
 using PriceWatch.Infrastructure.Settings;
@@ -158,11 +160,21 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserProductSubscriptionRepository, UserProductSubscriptionRepository>();
         services.AddScoped<IClickLogRepository, ClickLogRepository>();
         services.AddScoped<IOfferCandidateRepository, OfferCandidateRepository>();
+        services.AddScoped<IDeviceTokenRepository, DeviceTokenRepository>();
         services.AddScoped<IOfferMatchFeedbackRepository, OfferMatchFeedbackRepository>();
         services.AddHostedService<BackfillWorker>();
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
         services.AddSingleton<IDiscoveryGate, RedisDiscoveryGate>();
         services.AddHostedService<ProductMatchingConsumer>();
+
+        // push (FCM HTTP v1): sem credenciais o sender fica indisponível e os alertas seguem só por e-mail/in-app
+        services.Configure<FcmSettings>(configuration.GetSection("Fcm"));
+        services.AddHttpClient<FcmAccessTokenProvider>();
+        services.AddSingleton<IFcmAccessTokenProvider>(sp => sp.GetRequiredService<FcmAccessTokenProvider>());
+        services.AddHttpClient<FcmPushSender>()
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+        services.AddScoped<IPushSender>(sp => sp.GetRequiredService<FcmPushSender>());
 
         // descoberta de ofertas em outras lojas (M3): cada buscador nunca lança e fica indisponível sem credenciais
         services.AddHttpClient<KabumOfferSearcher>()
@@ -256,6 +268,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<CheckOfferPriceUseCase>();
         services.AddScoped<GetSupportedStoresUseCase>();
         services.AddScoped<DiscoverOffersUseCase>();
+        services.AddScoped<RegisterDeviceUseCase>();
+        services.AddScoped<UnregisterDeviceUseCase>();
         services.AddScoped<GetOfferCandidatesUseCase>();
         services.AddScoped<ConfirmOfferMatchUseCase>();
         services.AddScoped<LegacyProductCatalogFacade>();

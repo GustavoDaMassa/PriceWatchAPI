@@ -24,6 +24,7 @@ public class MongoDbIndexInitializer
         await CreateUserProductSubscriptionIndexesAsync();
         await CreateClickLogIndexesAsync();
         await CreateDiscoveryIndexesAsync();
+        await CreateDeviceTokenIndexesAsync();
     }
 
     private async Task CreateUserIndexesAsync()
@@ -99,6 +100,20 @@ public class MongoDbIndexInitializer
                 .Ascending(n => n.UserId)
                 .Descending(n => n.CreatedAt),
             new CreateIndexOptions { Name = "idx_notifications_userId_createdAt" }));
+    }
+
+    private async Task CreateDeviceTokenIndexesAsync()
+    {
+        var col = _database.GetCollection<DeviceTokenDocument>("device_tokens");
+
+        // o mesmo aparelho nunca aparece duas vezes (muda de dono em vez de duplicar)
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<DeviceTokenDocument>(
+            Builders<DeviceTokenDocument>.IndexKeys.Ascending(d => d.Token),
+            new CreateIndexOptions { Unique = true, Name = "idx_device_tokens_token_unique" }));
+
+        await col.Indexes.CreateOneAsync(new CreateIndexModel<DeviceTokenDocument>(
+            Builders<DeviceTokenDocument>.IndexKeys.Ascending(d => d.UserId),
+            new CreateIndexOptions { Name = "idx_device_tokens_userId" }));
     }
 
     private async Task CreateDiscoveryIndexesAsync()

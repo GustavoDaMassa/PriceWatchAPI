@@ -562,6 +562,15 @@ Os workers continuam registrados e checam a flag em runtime (a configuração é
 - **Candidata não é monitorada** (RI08): vive em `offer_candidates` e só vira `StoreOffer` quando anexada. Veredito é dado pessoal e é apagado com a conta.
 - **Dados do cliente (GTIN, imagem)** continuam ignorados na importação; entram como sugestão por esta mesma via de confirmação, se for preciso.
 
+## Notificações: in-app, push e e-mail (M4)
+
+- **Canais de um alerta (`ProcessAlertUseCase`):** (1) grava a `Notification` (central in-app, por polling), (2) **push** para todos os dispositivos do usuário, (3) **e-mail** (só com e-mail verificado). O push sai **antes** do e-mail: o e-mail é o único canal que pode lançar exceção (SMTP) e o `RedisStreamConsumer` não reprocessa mensagens com erro, então uma falha de SMTP não pode custar o push. O push é best-effort e isolado: nunca derruba a notificação nem o e-mail.
+- **Dispositivos:** `DeviceToken` (`device_tokens`, token único). `POST /api/devices` `{ token, platform }` é idempotente (201 ao criar, 200 ao renovar) e, se o token estava em outra conta, **passa para quem chamou** (o aparelho mudou de dono: o alerta nunca vai para a conta antiga). Plataformas: `android`, `ios`, `web`. `DELETE /api/devices/{id}` (só o dono). Apagados com a conta (LGPD).
+- **FCM HTTP v1 sem SDK (`FcmPushSender`):** `FcmAccessTokenProvider` assina um JWT RS256 com a conta de serviço (escopo `firebase.messaging`) e o troca no `token_uri`; o token de acesso fica em memória e é renovado 5 min antes de expirar. Só um token que o Firebase diz não reconhecer (404/`UNREGISTERED`, ou 400 `INVALID_ARGUMENT` sobre o registration token) vira `InvalidToken` e é descartado; qualquer outra falha mantém o token. Sem credenciais, `IsAvailable` é falso e os alertas seguem por e-mail e in-app. **Não validado contra o Firebase real.**
+- **Texto do push (`AlertTexts`):** português se o `locale` do usuário começa com `pt`, senão inglês; preços sempre em reais (`R$ 2.599,90` / `R$ 2,599.90`). `data` leva `type`, `productId` (id do item, para o app abrir a tela certa) e `notificationId`.
+- **E-mail em produção:** o `SmtpEmailSender` já existe; basta apontar `Smtp__*` para o Amazon SES (SMTP). Ver `proximos-passos.md`.
+- **Configuração (somente variáveis de ambiente):** `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_JSON_BASE64` (a conta de serviço em base64, uma linha só) no `docker-compose.prod.yml`.
+
 ## Decisões Técnicas — v1
 
 | # | Decisão | Motivo |
