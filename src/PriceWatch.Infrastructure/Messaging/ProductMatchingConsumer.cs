@@ -34,7 +34,7 @@ public class ProductMatchingConsumer : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_flags.MatchingEnabled)
+        if (!_flags.MatchingActive)
         {
             _logger.LogInformation("Product matching disabled (Features:MatchingEnabled=false); consumer idle.");
             return;
