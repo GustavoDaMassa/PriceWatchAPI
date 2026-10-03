@@ -26,6 +26,7 @@ using PriceWatch.Infrastructure.Fetchers;
 using PriceWatch.Infrastructure.Messaging;
 using PriceWatch.Infrastructure.Network;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Repositories;
+using PriceWatch.Infrastructure.Push;
 using PriceWatch.Infrastructure.Search;
 using PriceWatch.Infrastructure.Security;
 using PriceWatch.Infrastructure.Settings;
@@ -165,6 +166,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IProductMatchingEventPublisher, RedisStoreOfferEventPublisher>();
         services.AddSingleton<IDiscoveryGate, RedisDiscoveryGate>();
         services.AddHostedService<ProductMatchingConsumer>();
+
+        // push (FCM HTTP v1): sem credenciais o sender fica indisponível e os alertas seguem só por e-mail/in-app
+        services.Configure<FcmSettings>(configuration.GetSection("Fcm"));
+        services.AddHttpClient<FcmAccessTokenProvider>();
+        services.AddSingleton<IFcmAccessTokenProvider>(sp => sp.GetRequiredService<FcmAccessTokenProvider>());
+        services.AddHttpClient<FcmPushSender>()
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+        services.AddScoped<IPushSender>(sp => sp.GetRequiredService<FcmPushSender>());
 
         // descoberta de ofertas em outras lojas (M3): cada buscador nunca lança e fica indisponível sem credenciais
         services.AddHttpClient<KabumOfferSearcher>()

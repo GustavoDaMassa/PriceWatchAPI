@@ -26,6 +26,7 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
     public FakeEmailSender FakeEmail { get; } = new();
     public FakePriceFetcher FakeFetcher { get; } = new();
     public FakeOfferSearcher FakeSearcher { get; } = new();
+    public FakePushSender FakePush { get; } = new();
 
     private readonly MongoDbContainer _mongo = new MongoDbBuilder()
         .WithImage("mongo:7.0")
@@ -115,6 +116,10 @@ public class PriceWatchWebApplicationFactory : WebApplicationFactory<Program>, I
             // idem para a descoberta em outras lojas: nada de chamar Mercado Livre/Lomadee de verdade
             services.RemoveAll<IOfferSearcher>();
             services.AddSingleton<IOfferSearcher>(FakeSearcher);
+
+            // e o push: nada de falar com o Firebase de verdade
+            services.RemoveAll<IPushSender>();
+            services.AddSingleton<IPushSender>(FakePush);
         });
     }
 }
