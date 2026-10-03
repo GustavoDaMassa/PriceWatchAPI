@@ -12,6 +12,9 @@ public class PassthroughAffiliateLinkGenerator : IAffiliateLinkGenerator
 {
     public ProductSource ProductSource => ProductSource.Manual;
 
+    // não é uma rede de afiliados: só devolve a URL original
+    public bool IsAvailable => false;
+
     public bool CanHandle(string url) => true;
 
     public Task<string> GenerateAsync(string originalUrl) => Task.FromResult(originalUrl);

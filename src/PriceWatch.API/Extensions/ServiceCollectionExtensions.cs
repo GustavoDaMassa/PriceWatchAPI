@@ -13,6 +13,7 @@ using PriceWatch.Infrastructure.Persistence.MongoDB;
 using PriceWatch.Application.UseCases.Notification;
 using PriceWatch.Application.UseCases.Offers;
 using PriceWatch.Application.UseCases.ProductList;
+using PriceWatch.Application.UseCases.Stores;
 using PriceWatch.Application.UseCases.TrackedProduct;
 using PriceWatch.Application.UseCases.Users;
 using PriceWatch.Domain.Interfaces.Repositories;
@@ -214,6 +215,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<BackfillTrackedProductsUseCase>();
         services.AddScoped<MatchStoreOfferUseCase>();
         services.AddScoped<CheckOfferPriceUseCase>();
+        services.AddScoped<GetSupportedStoresUseCase>();
         services.AddScoped<LegacyProductCatalogFacade>();
         services.AddScoped<UnifiedProductCatalogFacade>();
         // escolhido a cada request pela flag (lazy via IOptions): cutover e rollback sem novo deploy
