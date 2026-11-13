@@ -1,4 +1,5 @@
 using PriceWatch.Domain.Enums;
+using PriceWatch.Domain.Services;
 
 namespace PriceWatch.Domain.Entities;
 
@@ -20,16 +21,10 @@ public class Notification
         string productId,
         string productName,
         NotificationType type,
-        decimal currentPrice)
+        decimal currentPrice,
+        string locale = "en")
     {
-        var message = type switch
-        {
-            NotificationType.TargetPriceReached =>
-                $"'{productName}' reached your target price! Current price: {currentPrice:C}",
-            NotificationType.NewLowestPrice =>
-                $"'{productName}' hit a new lowest price: {currentPrice:C}",
-            _ => $"Price update for '{productName}': {currentPrice:C}"
-        };
+        var message = AlertTexts.Message(locale, type, productName, currentPrice);
 
         return new Notification
         {

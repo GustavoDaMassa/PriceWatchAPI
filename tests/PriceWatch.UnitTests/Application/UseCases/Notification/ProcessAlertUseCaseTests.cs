@@ -116,6 +116,26 @@ public class ProcessAlertUseCaseTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task Execute_ForAPortugueseUser_WritesTheNotificationAndTheEmailSubjectInPortuguese()
+    {
+        var user = User.Create("Teste", "user@test.com", "hash", "token-abc", "pt-BR");
+        user.VerifyEmail(user.EmailVerificationToken!);
+        _userRepo.Setup(r => r.GetByIdAsync("user-1")).ReturnsAsync(user);
+        _emailSender.Setup(e => e.SendAlertEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        await _useCase.ExecuteAsync("user-1", "prod-1", "iPhone 15", NotificationType.TargetPriceReached, 3800m);
+
+        _notificationRepo.Verify(r => r.CreateAsync(It.Is<DomainNotification>(n =>
+            n.Message == "'iPhone 15' atingiu o seu preço-alvo! Preço atual: R$ 3.800,00")), Times.Once);
+        _emailSender.Verify(e => e.SendAlertEmailAsync(
+            "user@test.com",
+            "PriceWatch: 'iPhone 15' atingiu o seu preço-alvo!",
+            "'iPhone 15' atingiu o seu preço-alvo! Preço atual: R$ 3.800,00",
+            "pt-BR"), Times.Once);
+    }
+
     private static DeviceToken Device(string userId, string token) => DeviceToken.Create(userId, token, "android");
 
     private User UserWithDevices(bool verified, string locale, params DeviceToken[] devices)

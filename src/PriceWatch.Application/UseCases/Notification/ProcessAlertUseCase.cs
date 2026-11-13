@@ -34,10 +34,12 @@ public class ProcessAlertUseCase
         NotificationType type,
         decimal currentPrice)
     {
-        var notification = Domain.Entities.Notification.Create(userId, productId, productName, type, currentPrice);
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        var notification = Domain.Entities.Notification.Create(
+            userId, productId, productName, type, currentPrice, user?.Locale ?? "en");
         await _notificationRepository.CreateAsync(notification);
 
-        var user = await _userRepository.GetByIdAsync(userId);
         if (user is null)
             return;
 
@@ -48,9 +50,7 @@ public class ProcessAlertUseCase
         if (!user.IsEmailVerified)
             return;
 
-        var subject = type == NotificationType.TargetPriceReached
-            ? $"PriceWatch: '{productName}' reached your target price!"
-            : $"PriceWatch: New lowest price for '{productName}'!";
+        var subject = AlertTexts.EmailSubject(user.Locale, type, productName);
 
         await _emailSender.SendAlertEmailAsync(user.Email, subject, notification.Message, user.Locale);
     }
