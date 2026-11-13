@@ -58,7 +58,7 @@ public class DiscoveryFlowTests
         new(url, "Produto de Teste MarcaTeste ModeloTeste", 150m, "https://img/k.png", gtin, "MarcaTeste", "ModeloTeste");
 
     [Fact]
-    public async Task AGtinMatch_IsFoundPreselectedAndOnceConfirmedAppearsInTheComparison()
+    public async Task AGtinMatch_IsFoundPreselectedAndOnceAcceptedBecomesItsOwnTrackedProduct()
     {
         var (client, _) = await NewUserAsync();
         var gtin = NewGtin();
@@ -84,7 +84,10 @@ public class DiscoveryFlowTests
         var result = await feedback.Content.ReadFromJsonAsync<JsonElement>();
         result.GetProperty("outcome").GetInt32().Should().Be(2);            // Attached
         result.GetProperty("offerId").GetString().Should().NotBeNullOrEmpty();
-        (await OffersInComparisonAsync(client, productId)).Should().Be(2);
+        var newProductId = result.GetProperty("productId").GetString()!;
+        newProductId.Should().NotBe(productId);
+        (await OffersInComparisonAsync(client, productId)).Should().Be(1);   // o produto de origem não muda
+        (await OffersInComparisonAsync(client, newProductId)).Should().Be(1);
 
         var after = await (await client.GetAsync($"/api/products/{productId}/candidates")).Content.ReadFromJsonAsync<JsonElement>();
         after.GetArrayLength().Should().Be(0);
@@ -125,7 +128,7 @@ public class DiscoveryFlowTests
     }
 
     [Fact]
-    public async Task AKeywordMatchOnASharedProduct_StaysPendingUntilASecondUserConfirms()
+    public async Task AKeywordMatchOnASharedProduct_BecomesANewProductForTheUserWithoutAffectingTheOtherSubscribers()
     {
         var (alice, _) = await NewUserAsync();
         var (bob, _) = await NewUserAsync();
@@ -144,15 +147,15 @@ public class DiscoveryFlowTests
             candidate.GetProperty("preselected").GetBoolean().Should().BeFalse();
             var candidateId = candidate.GetProperty("id").GetString();
 
-            var first = await (await alice.PostAsJsonAsync($"/api/candidates/{candidateId}/feedback", new { isSameProduct = true, track = true }))
+            var result = await (await alice.PostAsJsonAsync($"/api/candidates/{candidateId}/feedback", new { isSameProduct = true, track = true }))
                 .Content.ReadFromJsonAsync<JsonElement>();
-            first.GetProperty("outcome").GetInt32().Should().Be(3);         // Pending
-            (await OffersInComparisonAsync(alice, productId)).Should().Be(1);
 
-            var second = await (await bob.PostAsJsonAsync($"/api/candidates/{candidateId}/feedback", new { isSameProduct = true, track = true }))
-                .Content.ReadFromJsonAsync<JsonElement>();
-            second.GetProperty("outcome").GetInt32().Should().Be(2);        // Attached (quórum)
-            (await OffersInComparisonAsync(alice, productId)).Should().Be(2);
+            result.GetProperty("outcome").GetInt32().Should().Be(2);        // Attached, sem segunda pessoa
+            var newProductId = result.GetProperty("productId").GetString()!;
+            newProductId.Should().NotBe(productId);
+            (await OffersInComparisonAsync(alice, newProductId)).Should().Be(1);
+            (await OffersInComparisonAsync(alice, productId)).Should().Be(1);
+            (await OffersInComparisonAsync(bob, productId)).Should().Be(1); // o catálogo compartilhado não mudou
         }
         finally
         {
@@ -161,7 +164,7 @@ public class DiscoveryFlowTests
     }
 
     [Fact]
-    public async Task AKeywordMatchForTheSoleSubscriber_AttachesImmediately()
+    public async Task AKeywordMatchForTheSoleSubscriber_IsTrackedImmediately()
     {
         var (client, _) = await NewUserAsync();
         var productId = await TrackAsync(client, NewMercadoLivreUrl(), NewGtin());

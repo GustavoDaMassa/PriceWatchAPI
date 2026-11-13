@@ -54,14 +54,13 @@ public class DiscoveryController : ControllerBase
     public async Task<IActionResult> GetCandidates(string productId) =>
         Ok(await _getCandidates.ExecuteAsync(GetUserId(), productId));
 
-    /// <summary>"É o mesmo produto?" e, se quiser, acompanhar a oferta.</summary>
+    /// <summary>"É parecido o bastante?" e, se quiser, acompanhar a oferta.</summary>
     /// <remarks>
-    /// O veredito é sempre gravado. A oferta só é anexada ao produto (comparação e monitoramento) se a
-    /// candidata veio por GTIN idêntico, se você é o único assinante do produto ou se outro usuário
-    /// também confirmou; senão o resultado é <c>Pending</c>.
+    /// O veredito é sempre gravado. Se o usuário aceitar e quiser acompanhar, a oferta vira um produto novo
+    /// na mesma lista do produto de origem, com histórico e alertas próprios. Só o próprio usuário decide.
     /// </remarks>
     /// <param name="id">ID da candidata.</param>
-    /// <response code="200">Resultado: Rejected, Recorded, Attached, Pending ou Unavailable.</response>
+    /// <response code="200">Resultado: Rejected, Recorded ou Attached (com o <c>productId</c> do produto novo).</response>
     /// <response code="404">Candidata inexistente, expirada ou de produto que o usuário não acompanha.</response>
     [HttpPost("/api/candidates/{id}/feedback")]
     [ProducesResponseType(typeof(ConfirmOfferMatchResponse), StatusCodes.Status200OK)]

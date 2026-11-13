@@ -1,5 +1,5 @@
 using PriceWatch.Application.DTOs.Discovery;
-using PriceWatch.Application.Interfaces;
+using PriceWatch.Application.DTOs.Offer;
 using PriceWatch.Application.UseCases.Offers;
 using PriceWatch.Domain.Entities;
 using PriceWatch.Domain.Enums;
@@ -9,41 +9,28 @@ using PriceWatch.Domain.Interfaces.Repositories;
 namespace PriceWatch.Application.UseCases.Discovery;
 
 /// <summary>
-/// O usuário responde "é o mesmo produto?" e, se quiser, passa a acompanhar a oferta. O veredito é
-/// sempre gravado (é o dado rotulado do matching). Anexar uma oferta a um produto altera o catálogo
-/// COMPARTILHADO (comparação e alertas de todos os assinantes), então um voto isolado não basta:
-/// anexa na hora só se (a) a candidata veio por GTIN idêntico (evidência objetiva), ou (b) quem votou é
-/// o único assinante do produto (ninguém mais é afetado), ou (c) um segundo usuário confirmou também.
-/// Produtos do catálogo nunca são fundidos por voto.
+/// O usuário responde "é parecido o bastante para acompanhar?" e, se quiser, passa a acompanhar a oferta.
+/// O veredito é sempre gravado (é o dado rotulado do matching). Quem decide é só o próprio usuário: a
+/// oferta aceita vira um produto NOVO na mesma lista do produto de origem, com histórico, preço-alvo e
+/// alertas próprios, então nunca altera o catálogo de outros assinantes e não precisa de segunda confirmação.
 /// </summary>
 public class ConfirmOfferMatchUseCase
 {
-    private const int QuorumVotes = 2;
-
     private readonly IOfferCandidateRepository _candidates;
     private readonly IOfferMatchFeedbackRepository _feedback;
     private readonly IUserProductSubscriptionRepository _subscriptions;
-    private readonly IProductRepository _products;
-    private readonly IStoreOfferRepository _offers;
-    private readonly IAffiliateLinkResolver _affiliateResolver;
-    private readonly SyncOfferActivityUseCase _syncActivity;
+    private readonly ICreateOfferUseCase _createOffer;
 
     public ConfirmOfferMatchUseCase(
         IOfferCandidateRepository candidates,
         IOfferMatchFeedbackRepository feedback,
         IUserProductSubscriptionRepository subscriptions,
-        IProductRepository products,
-        IStoreOfferRepository offers,
-        IAffiliateLinkResolver affiliateResolver,
-        SyncOfferActivityUseCase syncActivity)
+        ICreateOfferUseCase createOffer)
     {
         _candidates = candidates;
         _feedback = feedback;
         _subscriptions = subscriptions;
-        _products = products;
-        _offers = offers;
-        _affiliateResolver = affiliateResolver;
-        _syncActivity = syncActivity;
+        _createOffer = createOffer;
     }
 
     public async Task<ConfirmOfferMatchResponse> ExecuteAsync(string userId, string candidateId, ConfirmOfferMatchRequest request)
@@ -65,19 +52,10 @@ public class ConfirmOfferMatchUseCase
         if (!request.Track)
             return new ConfirmOfferMatchResponse(ConfirmOfferMatchOutcome.Recorded, candidate.ProductId, null);
 
-        if (request.TargetPrice is > 0m)
-        {
-            subscription.SetTargetPrice(request.TargetPrice.Value);
-            await _subscriptions.UpdateAsync(subscription);
-        }
+        var targetPrice = request.TargetPrice is > 0m ? request.TargetPrice.Value : subscription.TargetPrice;
+        var created = await _createOffer.ExecuteAsync(userId, new CreateOfferRequest(candidate.Url, targetPrice, subscription.ListId));
 
-        if (!await IsSafeToAttachAsync(userId, candidate))
-            return new ConfirmOfferMatchResponse(ConfirmOfferMatchOutcome.Pending, candidate.ProductId, null);
-
-        var offer = await AttachAsync(candidate);
-        return offer is null
-            ? new ConfirmOfferMatchResponse(ConfirmOfferMatchOutcome.Unavailable, candidate.ProductId, null)
-            : new ConfirmOfferMatchResponse(ConfirmOfferMatchOutcome.Attached, candidate.ProductId, offer.Id);
+        return new ConfirmOfferMatchResponse(ConfirmOfferMatchOutcome.Attached, created.ProductId, created.OfferId);
     }
 
     private async Task SaveFeedbackAsync(string userId, OfferCandidate candidate, MatchVerdict verdict, bool track)
@@ -89,45 +67,5 @@ public class ConfirmOfferMatchUseCase
             feedback.Revise(verdict, track);
 
         await _feedback.SaveAsync(feedback);
-    }
-
-    private async Task<bool> IsSafeToAttachAsync(string userId, OfferCandidate candidate)
-    {
-        if (candidate.Reason == CandidateReason.Gtin)
-            return true;
-
-        var otherActiveSubscribers = (await _subscriptions.GetByProductIdAsync(candidate.ProductId))
-            .Any(s => s.IsActive && s.UserId != userId);
-        if (!otherActiveSubscribers)
-            return true;
-
-        return await _feedback.CountTrackVotesAsync(candidate.Id) >= QuorumVotes;
-    }
-
-    private async Task<StoreOffer?> AttachAsync(OfferCandidate candidate)
-    {
-        var offer = await _offers.GetBySourceAndUrlAsync(candidate.Source, candidate.Url);
-
-        if (offer is not null && offer.ProductId != candidate.ProductId)
-            return null; // já pertence a outro produto do catálogo: não se funde por voto
-
-        if (offer is null)
-        {
-            offer = StoreOffer.Create(candidate.ProductId, candidate.Source, candidate.Url, candidate.Gtin);
-            offer.RecordPrice(candidate.Price);
-            offer.PostponeCheck(TimeSpan.Zero); // o worker confirma o preço real logo na próxima rodada
-            await OfferAffiliateLinker.TrySetAsync(_affiliateResolver, offer);
-            await _offers.CreateAsync(offer);
-        }
-
-        var product = await _products.GetByIdAsync(candidate.ProductId);
-        if (product is not null && product.MatchStatus != MatchStatus.Confirmed)
-        {
-            product.Confirm();
-            await _products.UpdateAsync(product);
-        }
-
-        await _syncActivity.ExecuteAsync(candidate.ProductId);
-        return offer;
     }
 }
