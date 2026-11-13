@@ -244,6 +244,31 @@ public class DiscoveryFlowTests
     }
 
     [Fact]
+    public async Task TwoUsersTrackingTheSameProduct_ShareOneSearch_AndEachJudgesOnTheirOwn()
+    {
+        var (alice, _) = await NewUserAsync();
+        var (bob, _) = await NewUserAsync();
+        var url = NewMercadoLivreUrl();
+        var gtin = NewGtin();
+        var productId = await TrackAsync(alice, url, gtin);
+        await TrackAsync(bob, url, gtin);                                   // mesmo link, mesmo produto
+        _factory.FakeSearcher.SetResultsForGtin(gtin, KabumResult(NewKabumUrl(), gtin), KabumResult(NewKabumUrl(), gtin));
+        var before = _factory.FakeSearcher.GtinCalls;
+
+        var forAlice = await DiscoverAsync(alice, productId);
+        var forBob = await DiscoverAsync(bob, productId);
+
+        (_factory.FakeSearcher.GtinCalls - before).Should().Be(1);          // a loja foi consultada uma vez só
+        forBob.Select(c => c.GetProperty("id").GetString()).Should().BeEquivalentTo(forAlice.Select(c => c.GetProperty("id").GetString()));
+        forBob.Should().HaveCount(2);
+
+        // o veredito de um não esconde a candidata do outro
+        await bob.PostAsJsonAsync($"/api/candidates/{forBob[0].GetProperty("id").GetString()}/feedback", new { isSameProduct = false, track = false });
+        (await (await alice.GetAsync($"/api/products/{productId}/candidates")).Content.ReadFromJsonAsync<JsonElement>()).GetArrayLength().Should().Be(2);
+        (await (await bob.GetAsync($"/api/products/{productId}/candidates")).Content.ReadFromJsonAsync<JsonElement>()).GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
     public async Task UsersWhoDoNotTrackTheProduct_CannotDiscoverListOrJudgeItsCandidates()
     {
         var (owner, _) = await NewUserAsync();
