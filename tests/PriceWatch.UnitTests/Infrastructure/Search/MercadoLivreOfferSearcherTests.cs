@@ -60,7 +60,7 @@ public class MercadoLivreOfferSearcherTests
             NullLogger<MercadoLivreOfferSearcher>.Instance);
     }
 
-    private const string ThreeProducts = """{"results":[{"id":"MLB111","name":"A"},{"id":"MLB222","name":"B"},{"id":"MLB333","name":"C"},{"id":"MLB444","name":"D"}]}""";
+    private const string FourProducts = """{"results":[{"id":"MLB111","name":"A"},{"id":"MLB222","name":"B"},{"id":"MLB333","name":"C"},{"id":"MLB444","name":"D"}]}""";
 
     [Fact]
     public void ProductSource_IsMercadoLivre()
@@ -121,14 +121,15 @@ public class MercadoLivreOfferSearcherTests
     }
 
     [Fact]
-    public async Task Search_ReadsAtMostThreeCatalogProducts()
+    public async Task Search_ReadsAtMostEightCatalogProducts()
     {
-        var searcher = Build(ThreeProducts);
+        var ids = string.Join(",", Enumerable.Range(101, 10).Select(i => $$"""{"id":"MLB{{i}}","name":"P"}"""));
+        var searcher = Build($$"""{"results":[{{ids}}]}""");
 
         var results = await searcher.SearchByKeywordAsync("galaxy");
 
-        results.Should().HaveCount(3);
-        _catalogFetcher.Verify(f => f.FetchAsync(It.Is<string>(u => u.EndsWith("MLB444"))), Times.Never);
+        results.Should().HaveCount(8);
+        _catalogFetcher.Verify(f => f.FetchAsync(It.Is<string>(u => u.EndsWith("MLB109"))), Times.Never);
     }
 
     [Fact]
@@ -136,18 +137,18 @@ public class MercadoLivreOfferSearcherTests
     {
         _catalogFetcher.Setup(f => f.FetchAsync("https://www.mercadolivre.com.br/p/MLB222"))
             .ThrowsAsync(new BusinessException("no price"));
-        var searcher = Build(ThreeProducts);
+        var searcher = Build(FourProducts);
 
         var results = await searcher.SearchByKeywordAsync("galaxy");
 
         results.Select(r => r.Url).Should().Equal(
-            "https://www.mercadolivre.com.br/p/MLB111", "https://www.mercadolivre.com.br/p/MLB333");
+            "https://www.mercadolivre.com.br/p/MLB111", "https://www.mercadolivre.com.br/p/MLB333", "https://www.mercadolivre.com.br/p/MLB444");
     }
 
     [Fact]
     public async Task Search_WhenMercadoLivreIsNotConfigured_ReturnsNothingWithoutCallingTheApi()
     {
-        var searcher = Build(ThreeProducts, configured: false);
+        var searcher = Build(FourProducts, configured: false);
 
         (await searcher.SearchByKeywordAsync("galaxy")).Should().BeEmpty();
         _sent.Should().BeEmpty();
@@ -168,7 +169,7 @@ public class MercadoLivreOfferSearcherTests
         (await Build(throwOnSend: true).SearchByKeywordAsync("galaxy")).Should().BeEmpty();
 
         _tokens.Setup(t => t.GetTokenAsync(It.IsAny<CancellationToken>())).ThrowsAsync(new HttpRequestException("auth down"));
-        (await Build(ThreeProducts).SearchByKeywordAsync("galaxy")).Should().BeEmpty();
+        (await Build(FourProducts).SearchByKeywordAsync("galaxy")).Should().BeEmpty();
     }
 
     [Fact]
