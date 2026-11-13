@@ -14,6 +14,9 @@ namespace PriceWatch.Application.UseCases.Discovery;
 /// do mesmo tipo de produto): GTIN primeiro (alta confiança) e, sem resultado útil, por palavra-chave. Cada resultado é pontuado (<see cref="CandidateScorer"/>) e as aprovadas viram
 /// <see cref="OfferCandidate"/>: NÃO são monitoradas nem alertam até o usuário confirmar (RI08).
 /// Roda no máximo uma vez por produto por janela de tempo, compartilhada entre usuários (RNF19).
+/// A "nova busca" (<c>findNew</c>) ignora a janela de 6 horas, mas tem uma pausa curta própria, e traz só o que
+/// ainda não apareceu: ignora candidatas anteriores, o que o usuário já julgou e o que ele já acompanha, e anda
+/// pelas próximas páginas de resultado quando a primeira não tem nada novo.
 /// </summary>
 public class DiscoverOffersUseCase
 {
@@ -21,11 +24,14 @@ public class DiscoverOffersUseCase
     private static readonly TimeSpan CandidateTimeToLive = TimeSpan.FromHours(24);
     private const int MaxCandidatesPerStore = 3;
     private const int MaxCandidatesToJudge = 6;
+    private const int MaxPagesWhenFindingNew = 3;
+    private static readonly TimeSpan FindNewCooldown = TimeSpan.FromSeconds(45);
 
     private readonly IUserProductSubscriptionRepository _subscriptions;
     private readonly IProductRepository _products;
     private readonly IStoreOfferRepository _offers;
     private readonly IOfferCandidateRepository _candidates;
+    private readonly IOfferMatchFeedbackRepository _feedback;
     private readonly IEnumerable<IOfferSearcher> _searchers;
     private readonly IDiscoveryGate _gate;
     private readonly IMatchJudge _judge;
@@ -35,6 +41,7 @@ public class DiscoverOffersUseCase
         IProductRepository products,
         IStoreOfferRepository offers,
         IOfferCandidateRepository candidates,
+        IOfferMatchFeedbackRepository feedback,
         IEnumerable<IOfferSearcher> searchers,
         IDiscoveryGate gate,
         IMatchJudge judge)
@@ -43,13 +50,14 @@ public class DiscoverOffersUseCase
         _products = products;
         _offers = offers;
         _candidates = candidates;
+        _feedback = feedback;
         _searchers = searchers;
         _gate = gate;
         _judge = judge;
     }
 
-    /// <returns>True se a busca rodou agora; false se já tinha rodado dentro da janela.</returns>
-    public async Task<bool> ExecuteAsync(string userId, string productId)
+    /// <returns>True se a busca rodou agora; false se já tinha rodado dentro da janela (ou, na nova busca, da pausa).</returns>
+    public async Task<bool> ExecuteAsync(string userId, string productId, bool findNew = false)
     {
         if (await _subscriptions.GetByUserIdAndProductIdAsync(userId, productId) is null)
             throw new ProductNotFoundException(productId);
@@ -57,28 +65,74 @@ public class DiscoverOffersUseCase
         var product = await _products.GetByIdAsync(productId)
             ?? throw new ProductNotFoundException(productId);
 
-        if (!await _gate.TryAcquireAsync(productId, DiscoveryWindow))
+        var acquired = findNew
+            ? await _gate.TryAcquireAsync($"{productId}:new", FindNewCooldown)
+            : await _gate.TryAcquireAsync(productId, DiscoveryWindow);
+        if (!acquired)
             return false;
 
-        var ownOffers = (await _offers.GetByProductIdAsync(productId)).ToList();
-        var trackedUrls = ownOffers.Select(o => o.Url).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var excludedUrls = await ExcludedUrlsAsync(userId, product, findNew);
         // a busca por palavra-chave só roda quando o GTIN não resolve; a IA (se ligada) tenta montar uma busca melhor
         var query = new Lazy<Task<string>>(() => BuildQueryAsync(product));
 
         var stores = _searchers.Where(s => s.IsAvailable).ToList();
+        var pages = findNew ? MaxPagesWhenFindingNew : 1;
 
-        // as buscas nas lojas rodam em paralelo; a gravação é sequencial
-        var found = await Task.WhenAll(stores.Select(async store => (Store: store, Results: await SearchAsync(store, product, query, trackedUrls))));
+        for (var page = 0; page < pages; page++)
+        {
+            // as buscas nas lojas rodam em paralelo; a gravação é sequencial
+            var found = await Task.WhenAll(stores.Select(async store =>
+                (Store: store, Results: await SearchAsync(store, product, query, excludedUrls, findNew, page))));
 
-        foreach (var (store, results) in found)
-            await SaveCandidatesAsync(product, store.ProductSource, results, trackedUrls);
+            var saved = 0;
+            foreach (var (store, results) in found)
+                saved += await SaveCandidatesAsync(product, store.ProductSource, results, excludedUrls);
+
+            // achou algo novo, ou as lojas não têm mais resultados: não precisa ir para a página seguinte
+            if (saved > 0 || found.All(f => f.Results.Count == 0))
+                break;
+        }
 
         return true;
     }
 
-    private static async Task<IReadOnlyList<OfferSearchResult>> SearchAsync(
-        IOfferSearcher store, Product product, Lazy<Task<string>> query, HashSet<string> trackedUrls)
+    /// <summary>
+    /// URLs que não devem voltar como sugestão: as ofertas do produto e tudo que o usuário já acompanha (em qualquer
+    /// produto dele). Na nova busca, também as candidatas que já apareceram e as que o usuário já julgou.
+    /// </summary>
+    private async Task<HashSet<string>> ExcludedUrlsAsync(string userId, Product product, bool findNew)
     {
+        var urls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var offer in await _offers.GetByProductIdAsync(product.Id))
+            urls.Add(offer.Url);
+
+        var userProductIds = (await _subscriptions.GetByUserIdAsync(userId)).Select(s => s.ProductId).Distinct().ToList();
+        if (userProductIds.Count > 0)
+        {
+            foreach (var offer in await _offers.GetByProductIdsAsync(userProductIds))
+                urls.Add(offer.Url);
+        }
+
+        if (findNew)
+        {
+            foreach (var candidate in await _candidates.GetByProductIdAsync(product.Id))
+                urls.Add(candidate.Url);
+
+            foreach (var verdict in await _feedback.GetByUserAndProductAsync(userId, product.Id))
+                urls.Add(verdict.Url);
+        }
+
+        return urls;
+    }
+
+    private static async Task<IReadOnlyList<OfferSearchResult>> SearchAsync(
+        IOfferSearcher store, Product product, Lazy<Task<string>> query, HashSet<string> trackedUrls, bool findNew, int page)
+    {
+        // a nova busca anda pelas páginas da busca por palavra-chave (o GTIN só tem uma "página": a primeira busca já o usou)
+        if (findNew)
+            return await store.SearchByKeywordPageAsync(await query.Value, page);
+
         if (product.Gtin is not null)
         {
             // na loja de origem a busca por GTIN devolve o próprio produto: sem outro resultado, cai para a palavra-chave
@@ -108,7 +162,7 @@ public class DiscoverOffersUseCase
         return normalized is not null && trackedUrls.Contains(normalized.Url);
     }
 
-    private async Task SaveCandidatesAsync(
+    private async Task<int> SaveCandidatesAsync(
         Product product, ProductSource source, IReadOnlyList<OfferSearchResult> results, HashSet<string> trackedUrls)
     {
         var scored = results
@@ -127,6 +181,7 @@ public class DiscoverOffersUseCase
             .ThenByDescending(x => x.Score.Score)
             .Take(MaxCandidatesPerStore);
 
+        var savedCount = 0;
         foreach (var (result, score, ai) in accepted)
         {
             var candidate = await _candidates.GetByKeyAsync(product.Id, source, result.Url);
@@ -139,7 +194,10 @@ public class DiscoverOffersUseCase
                 candidate.ApplyJudgement(ai.SameProduct, ai.Reason);
 
             await _candidates.SaveAsync(candidate);
+            savedCount++;
         }
+
+        return savedCount;
     }
 
     /// <summary>

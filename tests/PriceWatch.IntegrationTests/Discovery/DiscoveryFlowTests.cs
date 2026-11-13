@@ -186,6 +186,42 @@ public class DiscoveryFlowTests
     }
 
     [Fact]
+    public async Task ANewSearch_SkipsTheSixHourWindow_FindsOnlyNewOnesAndHasACooldown()
+    {
+        var (client, _) = await NewUserAsync();
+        var productId = await TrackAsync(client, NewMercadoLivreUrl(), NewGtin());
+        var shownUrl = NewKabumUrl();
+        var newUrl = NewKabumUrl();
+        _factory.FakeSearcher.KeywordHandler = _ => [KabumResult(shownUrl)];
+        try
+        {
+            var firstRun = await DiscoverAsync(client, productId);
+            firstRun.Should().ContainSingle().Which.GetProperty("url").GetString().Should().Be(shownUrl);
+
+            // a mesma busca de novo cai na janela de 6 horas e não chama a loja; a nova busca chama
+            _factory.FakeSearcher.KeywordHandler = _ => [KabumResult(shownUrl), KabumResult(newUrl)];
+            var before = _factory.FakeSearcher.KeywordCalls;
+            await DiscoverAsync(client, productId);
+            (_factory.FakeSearcher.KeywordCalls - before).Should().Be(0);
+
+            var refreshed = await client.PostAsync($"/api/products/{productId}/discover?refresh=true", null);
+
+            refreshed.StatusCode.Should().Be(HttpStatusCode.OK);
+            var urls = (await refreshed.Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray()
+                .Select(c => c.GetProperty("url").GetString()).ToList();
+            urls.Should().BeEquivalentTo([shownUrl, newUrl]);                // a antiga segue pendente e a nova chegou
+            (_factory.FakeSearcher.KeywordCalls - before).Should().BeGreaterThan(0);
+
+            var again = await client.PostAsync($"/api/products/{productId}/discover?refresh=true", null);
+            again.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);   // pausa entre novas buscas
+        }
+        finally
+        {
+            _factory.FakeSearcher.KeywordHandler = _ => [];
+        }
+    }
+
+    [Fact]
     public async Task UsersWhoDoNotTrackTheProduct_CannotDiscoverListOrJudgeItsCandidates()
     {
         var (owner, _) = await NewUserAsync();

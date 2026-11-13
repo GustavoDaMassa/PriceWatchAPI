@@ -95,6 +95,26 @@ public class MercadoLivreOfferSearcherTests
     }
 
     [Fact]
+    public async Task SearchByKeywordPage_AsksTheCatalogForTheMatchingOffset()
+    {
+        var searcher = Build();
+
+        await searcher.SearchByKeywordPageAsync("galaxy s23", 2);
+
+        _sent.Single().RequestUri!.AbsoluteUri.Should().Contain("offset=40").And.Contain("limit=20");
+    }
+
+    [Fact]
+    public async Task SearchByKeyword_AsksForTheFirstPage()
+    {
+        var searcher = Build();
+
+        await searcher.SearchByKeywordAsync("galaxy s23");
+
+        _sent.Single().RequestUri!.AbsoluteUri.Should().Contain("offset=0");
+    }
+
+    [Fact]
     public async Task SearchByKeyword_EncodesTheQuery()
     {
         var searcher = Build();

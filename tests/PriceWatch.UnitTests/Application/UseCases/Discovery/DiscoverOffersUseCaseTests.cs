@@ -18,6 +18,7 @@ public class DiscoverOffersUseCaseTests
     private readonly Mock<IProductRepository> _products = new();
     private readonly Mock<IStoreOfferRepository> _offers = new();
     private readonly Mock<IOfferCandidateRepository> _candidates = new();
+    private readonly Mock<IOfferMatchFeedbackRepository> _feedback = new();
     private readonly Mock<IDiscoveryGate> _gate = new();
     private readonly Mock<IMatchJudge> _judge = new();
     private readonly List<Mock<IOfferSearcher>> _searchers = new();
@@ -38,20 +39,30 @@ public class DiscoverOffersUseCaseTests
         _candidates.Setup(r => r.GetByKeyAsync(It.IsAny<string>(), It.IsAny<ProductSource>(), It.IsAny<string>()))
             .ReturnsAsync((OfferCandidate?)null);
         _judge.Setup(j => j.IsAvailable).Returns(false);
+        _gate.Setup(g => g.TryAcquireAsync($"{_product.Id}:new", It.IsAny<TimeSpan>())).ReturnsAsync(true);
+        _candidates.Setup(r => r.GetByProductIdAsync(_product.Id)).ReturnsAsync(Array.Empty<OfferCandidate>());
+        _feedback.Setup(r => r.GetByUserAndProductAsync(UserId, _product.Id)).ReturnsAsync(Array.Empty<OfferMatchFeedback>());
+        _subscriptions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<string?>())).ReturnsAsync(Array.Empty<UserProductSubscription>());
     }
 
     private DiscoverOffersUseCase Build() =>
-        new(_subscriptions.Object, _products.Object, _offers.Object, _candidates.Object,
+        new(_subscriptions.Object, _products.Object, _offers.Object, _candidates.Object, _feedback.Object,
             _searchers.Select(s => s.Object), _gate.Object, _judge.Object);
 
     private Mock<IOfferSearcher> Searcher(ProductSource source, bool available = true,
-        IReadOnlyList<OfferSearchResult>? byGtin = null, IReadOnlyList<OfferSearchResult>? byKeyword = null)
+        IReadOnlyList<OfferSearchResult>? byGtin = null, IReadOnlyList<OfferSearchResult>? byKeyword = null,
+        IReadOnlyList<IReadOnlyList<OfferSearchResult>>? pages = null)
     {
         var searcher = new Mock<IOfferSearcher>();
         searcher.Setup(s => s.ProductSource).Returns(source);
         searcher.Setup(s => s.IsAvailable).Returns(available);
         searcher.Setup(s => s.SearchByGtinAsync(It.IsAny<string>())).ReturnsAsync(byGtin ?? []);
         searcher.Setup(s => s.SearchByKeywordAsync(It.IsAny<string>())).ReturnsAsync(byKeyword ?? []);
+        for (var page = 0; page < 5; page++)
+        {
+            var results = pages is not null && page < pages.Count ? pages[page] : [];
+            searcher.Setup(s => s.SearchByKeywordPageAsync(It.IsAny<string>(), page)).ReturnsAsync(results);
+        }
         _searchers.Add(searcher);
         return searcher;
     }
@@ -314,5 +325,130 @@ public class DiscoverOffersUseCaseTests
         await Build().ExecuteAsync(UserId, _product.Id);
 
         store.Verify(s => s.SearchByKeywordAsync(It.Is<string>(q => q.Contains("acer"))), Times.Once);
+    }
+
+    // ---- nova busca (findNew) ----
+
+    [Fact]
+    public async Task FindNew_IgnoresTheSixHourWindowButHasItsOwnShortCooldown()
+    {
+        _gate.Setup(g => g.TryAcquireAsync(_product.Id, It.IsAny<TimeSpan>())).ReturnsAsync(false);
+        var store = Searcher(ProductSource.MercadoLivre, pages: [[Result("https://ml/p/MLB2", AcerTitle)]]);
+        var saved = Saved();
+
+        var ran = await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        ran.Should().BeTrue();
+        saved.Should().ContainSingle();
+        _gate.Verify(g => g.TryAcquireAsync($"{_product.Id}:new", TimeSpan.FromSeconds(45)), Times.Once);
+        store.Verify(s => s.SearchByGtinAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task FindNew_WhenTheCooldownIsActive_DoesNotCallTheStores()
+    {
+        _gate.Setup(g => g.TryAcquireAsync($"{_product.Id}:new", It.IsAny<TimeSpan>())).ReturnsAsync(false);
+        var store = Searcher(ProductSource.MercadoLivre, pages: [[Result("https://ml/p/MLB2", AcerTitle)]]);
+
+        var ran = await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        ran.Should().BeFalse();
+        store.Verify(s => s.SearchByKeywordPageAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task FindNew_SkipsCandidatesThatAlreadyAppearedAndWhatTheUserAlreadyJudged()
+    {
+        var shown = OfferCandidate.Create(_product.Id, ProductSource.MercadoLivre, Result("https://ml/p/MLB10", AcerTitle), 0.9, CandidateReason.Keyword, TimeSpan.FromHours(1));
+        _candidates.Setup(r => r.GetByProductIdAsync(_product.Id)).ReturnsAsync(new[] { shown });
+        _feedback.Setup(r => r.GetByUserAndProductAsync(UserId, _product.Id)).ReturnsAsync(new[]
+        {
+            OfferMatchFeedback.Create(UserId, "c-old", _product.Id, "https://ml/p/MLB11", MatchVerdict.NotSame, false)
+        });
+        Searcher(ProductSource.MercadoLivre, pages:
+        [[
+            Result("https://ml/p/MLB10", AcerTitle),
+            Result("https://ml/p/MLB11", AcerTitle),
+            Result("https://ml/p/MLB12", AcerTitle)
+        ]]);
+        var saved = Saved();
+
+        await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        saved.Select(c => c.Url).Should().Equal("https://ml/p/MLB12");
+    }
+
+    [Fact]
+    public async Task FindNew_SkipsWhatTheUserAlreadyTracksInAnyOfTheirProducts()
+    {
+        var other = Product.Create("Outro produto");
+        _subscriptions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<string?>()))
+            .ReturnsAsync(new[] { UserProductSubscription.Create(UserId, other.Id, 1m) });
+        _offers.Setup(r => r.GetByProductIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync(new[] { StoreOffer.Create(other.Id, ProductSource.MercadoLivre, "https://ml/p/MLB20") });
+        Searcher(ProductSource.MercadoLivre, pages: [[Result("https://ml/p/MLB20", AcerTitle), Result("https://ml/p/MLB21", AcerTitle)]]);
+        var saved = Saved();
+
+        await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        saved.Select(c => c.Url).Should().Equal("https://ml/p/MLB21");
+    }
+
+    [Fact]
+    public async Task FindNew_WhenThePageHasNothingNew_GoesOnToTheNextPage()
+    {
+        var shown = OfferCandidate.Create(_product.Id, ProductSource.MercadoLivre, Result("https://ml/p/MLB10", AcerTitle), 0.9, CandidateReason.Keyword, TimeSpan.FromHours(1));
+        _candidates.Setup(r => r.GetByProductIdAsync(_product.Id)).ReturnsAsync(new[] { shown });
+        var store = Searcher(ProductSource.MercadoLivre, pages:
+        [
+            [Result("https://ml/p/MLB10", AcerTitle)],
+            [Result("https://ml/p/MLB30", AcerTitle)]
+        ]);
+        var saved = Saved();
+
+        await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        saved.Select(c => c.Url).Should().Equal("https://ml/p/MLB30");
+        store.Verify(s => s.SearchByKeywordPageAsync(It.IsAny<string>(), 2), Times.Never);
+    }
+
+    [Fact]
+    public async Task FindNew_StopsAtThreePages()
+    {
+        var shown = OfferCandidate.Create(_product.Id, ProductSource.MercadoLivre, Result("https://ml/p/MLB10", AcerTitle), 0.9, CandidateReason.Keyword, TimeSpan.FromHours(1));
+        _candidates.Setup(r => r.GetByProductIdAsync(_product.Id)).ReturnsAsync(new[] { shown });
+        IReadOnlyList<OfferSearchResult> onlyKnown = [Result("https://ml/p/MLB10", AcerTitle)];
+        var endless = Searcher(ProductSource.MercadoLivre, pages: [onlyKnown, onlyKnown, onlyKnown, onlyKnown]);
+
+        await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        endless.Verify(s => s.SearchByKeywordPageAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Exactly(3));
+    }
+
+    [Fact]
+    public async Task FindNew_WhenTheStoreRunsOutOfResults_DoesNotAskForMorePages()
+    {
+        var empty = Searcher(ProductSource.MercadoLivre);
+
+        await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        empty.Verify(s => s.SearchByKeywordPageAsync(It.IsAny<string>(), 0), Times.Once);
+        empty.Verify(s => s.SearchByKeywordPageAsync(It.IsAny<string>(), 1), Times.Never);
+    }
+
+    [Fact]
+    public async Task Execute_NeverSuggestsWhatTheUserAlreadyTracksInAnotherProduct()
+    {
+        var other = Product.Create("Outro produto");
+        _subscriptions.Setup(r => r.GetByUserIdAsync(UserId, It.IsAny<string?>()))
+            .ReturnsAsync(new[] { UserProductSubscription.Create(UserId, other.Id, 1m) });
+        _offers.Setup(r => r.GetByProductIdsAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync(new[] { StoreOffer.Create(other.Id, ProductSource.MercadoLivre, "https://ml/p/MLB40") });
+        Searcher(ProductSource.MercadoLivre, byKeyword: [Result("https://ml/p/MLB40", AcerTitle), Result("https://ml/p/MLB41", AcerTitle)]);
+        var saved = Saved();
+
+        await Build().ExecuteAsync(UserId, _product.Id);
+
+        saved.Select(c => c.Url).Should().Equal("https://ml/p/MLB41");
     }
 }

@@ -27,21 +27,35 @@ public class DiscoveryController : ControllerBase
         _confirm = confirm;
     }
 
-    /// <summary>Procura o produto nas outras lojas e devolve as ofertas candidatas.</summary>
+    /// <summary>Procura produtos parecidos e devolve as candidatas que o usuário ainda não julgou.</summary>
     /// <remarks>
-    /// Usa o GTIN quando existe e, sem resultado, busca por palavra-chave; cada resultado é pontuado.
-    /// A busca roda no máximo uma vez por produto a cada 6 horas (compartilhada entre usuários); nas
-    /// chamadas seguintes devolve as candidatas já encontradas. Candidatas NÃO são monitoradas até a confirmação.
+    /// Usa o GTIN quando existe e, sem resultado, busca por palavra-chave; cada resultado é pontuado. A busca roda no
+    /// máximo uma vez por produto a cada 6 horas (compartilhada entre usuários); nas chamadas seguintes devolve as
+    /// candidatas já encontradas. Com <c>refresh=true</c> faz uma <b>nova busca</b>: ignora a janela de 6 horas e traz só
+    /// o que ainda não apareceu (ignora candidatas anteriores, o que o usuário já julgou e o que ele já acompanha),
+    /// andando pelas próximas páginas de resultado se preciso. Há uma pausa de 45 segundos entre novas buscas do mesmo
+    /// produto. Candidatas NÃO são monitoradas até a confirmação.
     /// </remarks>
     /// <param name="productId">ID do produto-mestre (<c>productId</c> das respostas de oferta e de itens).</param>
-    /// <response code="200">Candidatas que o usuário ainda não julgou.</response>
+    /// <param name="refresh">True para fazer uma nova busca por produtos que ainda não apareceram.</param>
+    /// <response code="200">Candidatas que o usuário ainda não julgou (as antigas ainda pendentes e as novas).</response>
     /// <response code="404">O usuário não acompanha este produto.</response>
+    /// <response code="429">Nova busca pedida de novo antes da pausa de 45 segundos.</response>
     [HttpPost("/api/products/{productId}/discover")]
     [ProducesResponseType(typeof(IReadOnlyList<OfferCandidateResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Discover(string productId)
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> Discover(string productId, [FromQuery] bool refresh = false)
     {
-        await _discover.ExecuteAsync(GetUserId(), productId);
+        var ran = await _discover.ExecuteAsync(GetUserId(), productId, refresh);
+        if (refresh && !ran)
+            return StatusCode(StatusCodes.Status429TooManyRequests, new
+            {
+                status = StatusCodes.Status429TooManyRequests,
+                error = "Too Many Requests",
+                message = "A new search for this product was just made. Please wait a moment."
+            });
+
         return Ok(await _getCandidates.ExecuteAsync(GetUserId(), productId));
     }
 

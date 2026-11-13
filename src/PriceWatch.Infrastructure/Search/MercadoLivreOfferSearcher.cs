@@ -52,9 +52,12 @@ public partial class MercadoLivreOfferSearcher : IOfferSearcher
         SearchAsync($"{SearchUrl}&product_identifier={Uri.EscapeDataString(gtin.Trim())}");
 
     public Task<IReadOnlyList<OfferSearchResult>> SearchByKeywordAsync(string query) =>
-        string.IsNullOrWhiteSpace(query)
+        SearchByKeywordPageAsync(query, 0);
+
+    public Task<IReadOnlyList<OfferSearchResult>> SearchByKeywordPageAsync(string query, int page) =>
+        string.IsNullOrWhiteSpace(query) || page < 0
             ? Task.FromResult<IReadOnlyList<OfferSearchResult>>([])
-            : SearchAsync($"{SearchUrl}&q={Uri.EscapeDataString(query.Trim())}");
+            : SearchAsync($"{SearchUrl}&offset={page * MaxProducts}&q={Uri.EscapeDataString(query.Trim())}");
 
     private async Task<IReadOnlyList<OfferSearchResult>> SearchAsync(string url)
     {
