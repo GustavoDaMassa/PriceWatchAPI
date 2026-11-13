@@ -23,6 +23,7 @@ using PriceWatch.Domain.Interfaces.Services;
 using PriceWatch.Infrastructure.Affiliates;
 using PriceWatch.Infrastructure.Email;
 using PriceWatch.Infrastructure.Fetchers;
+using PriceWatch.Infrastructure.Matching;
 using PriceWatch.Infrastructure.Messaging;
 using PriceWatch.Infrastructure.Network;
 using PriceWatch.Infrastructure.Persistence.MongoDB.Repositories;
@@ -190,6 +191,12 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IOptions<MercadoLivreSettings>>(),
             sp.GetRequiredService<MercadoLivreFetcher>(),
             sp.GetRequiredService<ILogger<MercadoLivreOfferSearcher>>()));
+
+        // juiz de IA (plano grátis do Gemini): desligado sem a chave `Gemini:ApiKey`; a descoberta continua só com as regras
+        services.Configure<GeminiSettings>(configuration.GetSection("Gemini"));
+        services.AddHttpClient<IMatchJudge, GeminiMatchJudge>(client => client.Timeout = TimeSpan.FromSeconds(20))
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
 
         // resolução de links curtos com defesa contra SSRF (só IPs públicos, validado também na conexão)
         services.AddSingleton<IHostAddressResolver, DnsHostAddressResolver>();

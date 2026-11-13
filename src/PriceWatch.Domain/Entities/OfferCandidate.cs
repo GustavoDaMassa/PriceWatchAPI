@@ -22,6 +22,12 @@ public class OfferCandidate
     public string? Model { get; private set; }
     public double Score { get; private set; }
     public CandidateReason Reason { get; private set; }
+
+    /// <summary>Veredito do juiz de IA ("é o mesmo produto?"); nulo quando a IA não foi consultada ou não respondeu.</summary>
+    public bool? AiSaysSame { get; private set; }
+
+    /// <summary>Justificativa curta da IA, mostrada ao usuário.</summary>
+    public string? AiReason { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime ExpiresAt { get; private set; }
 
@@ -58,13 +64,19 @@ public class OfferCandidate
     public static OfferCandidate Restore(
         string id, string productId, ProductSource source, string url, string name, decimal price,
         string? imageUrl, string? gtin, string? brand, string? model, double score, CandidateReason reason,
-        DateTime createdAt, DateTime expiresAt) =>
+        DateTime createdAt, DateTime expiresAt, bool? aiSaysSame = null, string? aiReason = null) =>
         new()
         {
             Id = id, ProductId = productId, Source = source, Url = url, Name = name, Price = price,
             ImageUrl = imageUrl, Gtin = gtin, Brand = brand, Model = model, Score = score, Reason = reason,
-            CreatedAt = createdAt, ExpiresAt = expiresAt
+            CreatedAt = createdAt, ExpiresAt = expiresAt, AiSaysSame = aiSaysSame, AiReason = aiReason
         };
+
+    public void ApplyJudgement(bool sameProduct, string reason)
+    {
+        AiSaysSame = sameProduct;
+        AiReason = reason;
+    }
 
     // nova busca encontrou a mesma oferta (mesma loja e URL): atualiza preço/nome e renova a validade,
     // mantendo o id para os vereditos já dados continuarem apontando para ela

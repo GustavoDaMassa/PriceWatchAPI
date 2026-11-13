@@ -20,4 +20,6 @@ public record OfferCandidateResponse(
     string? Model,
     double Score,
     CandidateReason Reason,
-    bool Preselected);
+    bool Preselected,
+    bool? AiSaysSame = null,
+    string? AiReason = null);

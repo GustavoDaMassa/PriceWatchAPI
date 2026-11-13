@@ -9,12 +9,12 @@ public static class OfferCandidateMappings
     {
         Id = c.Id, ProductId = c.ProductId, Source = c.Source, Url = c.Url, Name = c.Name, Price = c.Price,
         ImageUrl = c.ImageUrl, Gtin = c.Gtin, Brand = c.Brand, Model = c.Model, Score = c.Score,
-        Reason = c.Reason, CreatedAt = c.CreatedAt, ExpiresAt = c.ExpiresAt
+        Reason = c.Reason, AiSaysSame = c.AiSaysSame, AiReason = c.AiReason, CreatedAt = c.CreatedAt, ExpiresAt = c.ExpiresAt
     };
 
     public static OfferCandidate ToDomain(OfferCandidateDocument d) => OfferCandidate.Restore(
         d.Id, d.ProductId, d.Source, d.Url, d.Name, d.Price, d.ImageUrl, d.Gtin, d.Brand, d.Model,
-        d.Score, d.Reason, d.CreatedAt, d.ExpiresAt);
+        d.Score, d.Reason, d.CreatedAt, d.ExpiresAt, d.AiSaysSame, d.AiReason);
 }
 
 public static class OfferMatchFeedbackMappings

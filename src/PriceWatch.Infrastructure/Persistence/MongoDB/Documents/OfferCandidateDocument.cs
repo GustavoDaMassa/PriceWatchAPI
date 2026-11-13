@@ -43,6 +43,12 @@ public class OfferCandidateDocument
     [BsonElement("reason")]
     public CandidateReason Reason { get; set; }
 
+    [BsonElement("aiSaysSame")]
+    public bool? AiSaysSame { get; set; }
+
+    [BsonElement("aiReason")]
+    public string? AiReason { get; set; }
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; }
 

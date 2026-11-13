@@ -19,6 +19,7 @@ public class DiscoverOffersUseCaseTests
     private readonly Mock<IStoreOfferRepository> _offers = new();
     private readonly Mock<IOfferCandidateRepository> _candidates = new();
     private readonly Mock<IDiscoveryGate> _gate = new();
+    private readonly Mock<IMatchJudge> _judge = new();
     private readonly List<Mock<IOfferSearcher>> _searchers = new();
 
     private readonly Product _product = Product.Create(
@@ -36,11 +37,12 @@ public class DiscoverOffersUseCaseTests
         _gate.Setup(g => g.TryAcquireAsync(_product.Id, It.IsAny<TimeSpan>())).ReturnsAsync(true);
         _candidates.Setup(r => r.GetByKeyAsync(It.IsAny<string>(), It.IsAny<ProductSource>(), It.IsAny<string>()))
             .ReturnsAsync((OfferCandidate?)null);
+        _judge.Setup(j => j.IsAvailable).Returns(false);
     }
 
     private DiscoverOffersUseCase Build() =>
         new(_subscriptions.Object, _products.Object, _offers.Object, _candidates.Object,
-            _searchers.Select(s => s.Object), _gate.Object);
+            _searchers.Select(s => s.Object), _gate.Object, _judge.Object);
 
     private Mock<IOfferSearcher> Searcher(ProductSource source, bool available = true,
         IReadOnlyList<OfferSearchResult>? byGtin = null, IReadOnlyList<OfferSearchResult>? byKeyword = null)
@@ -132,15 +134,29 @@ public class DiscoverOffersUseCaseTests
     }
 
     [Fact]
-    public async Task Execute_SkipsStoresThatAlreadyHaveAnOfferForTheProduct()
+    public async Task Execute_AlsoSearchesTheStoreOfTheOriginOffer()
     {
-        var mercadoLivre = Searcher(ProductSource.MercadoLivre, byKeyword: [Result("https://ml/outro", "Notebook Gamer Acer Nitro 5 AN515-58 16GB")]);
-        Searcher(ProductSource.Kabum);
+        var mercadoLivre = Searcher(ProductSource.MercadoLivre, byGtin: [Result("https://ml/outro", "x", gtin: "7891234567895")]);
+        var saved = Saved();
 
         await Build().ExecuteAsync(UserId, _product.Id);
 
-        mercadoLivre.Verify(s => s.SearchByGtinAsync(It.IsAny<string>()), Times.Never);
-        mercadoLivre.Verify(s => s.SearchByKeywordAsync(It.IsAny<string>()), Times.Never);
+        mercadoLivre.Verify(s => s.SearchByGtinAsync("7891234567895"), Times.Once);
+        saved.Should().ContainSingle().Which.Source.Should().Be(ProductSource.MercadoLivre);
+    }
+
+    [Fact]
+    public async Task Execute_WhenTheGtinSearchOnlyReturnsTheTrackedOffer_FallsBackToTheKeywordSearch()
+    {
+        var mercadoLivre = Searcher(ProductSource.MercadoLivre,
+            byGtin: [Result("https://ml/origem", "Notebook Gamer Acer Nitro 5 AN515-58 16GB", gtin: "7891234567895")],
+            byKeyword: [Result("https://ml/outro", "Notebook Gamer Acer Nitro 5 AN515-58 16GB Intel Core i5")]);
+        var saved = Saved();
+
+        await Build().ExecuteAsync(UserId, _product.Id);
+
+        mercadoLivre.Verify(s => s.SearchByKeywordAsync(It.IsAny<string>()), Times.Once);
+        saved.Select(c => c.Url).Should().Equal("https://ml/outro");
     }
 
     [Fact]
@@ -225,5 +241,78 @@ public class DiscoverOffersUseCaseTests
 
         kabum.Verify(s => s.SearchByGtinAsync(It.IsAny<string>()), Times.Never);
         kabum.Verify(s => s.SearchByKeywordAsync(It.Is<string>(q => q.Contains("acer"))), Times.Once);
+    }
+
+    private static readonly string AcerTitle = "Notebook Gamer Acer Nitro 5 AN515-58 16GB Intel Core i5";
+
+    [Fact]
+    public async Task Execute_WithTheJudge_DropsTheCandidatesItSaysAreADifferentProductAndKeepsItsReason()
+    {
+        _judge.Setup(j => j.IsAvailable).Returns(true);
+        _judge.Setup(j => j.JudgeAsync(_product, It.IsAny<IReadOnlyList<OfferSearchResult>>()))
+            .ReturnsAsync(new[] { new MatchJudgement(0, false, "É uma capa"), new MatchJudgement(1, true, "Mesmo modelo e memória") });
+        Searcher(ProductSource.MercadoLivre, byKeyword:
+        [
+            Result("https://ml/p/MLB1", AcerTitle + " capa"),
+            Result("https://ml/p/MLB2", AcerTitle)
+        ]);
+        var saved = Saved();
+
+        await Build().ExecuteAsync(UserId, _product.Id);
+
+        var candidate = saved.Should().ContainSingle().Subject;
+        candidate.AiSaysSame.Should().BeTrue();
+        candidate.AiReason.Should().Be("Mesmo modelo e memória");
+    }
+
+    [Fact]
+    public async Task Execute_WhenTheJudgeDoesNotAnswer_KeepsWhatTheRulesApproved()
+    {
+        _judge.Setup(j => j.IsAvailable).Returns(true);
+        _judge.Setup(j => j.JudgeAsync(It.IsAny<Product>(), It.IsAny<IReadOnlyList<OfferSearchResult>>()))
+            .ReturnsAsync((IReadOnlyList<MatchJudgement>?)null);
+        Searcher(ProductSource.MercadoLivre, byKeyword: [Result("https://ml/p/MLB2", AcerTitle)]);
+        var saved = Saved();
+
+        await Build().ExecuteAsync(UserId, _product.Id);
+
+        saved.Should().ContainSingle().Which.AiSaysSame.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Execute_DoesNotAskTheJudgeAboutAGtinMatch()
+    {
+        _judge.Setup(j => j.IsAvailable).Returns(true);
+        Searcher(ProductSource.MercadoLivre, byGtin: [Result("https://ml/p/MLB9", "Qualquer titulo", gtin: "7891234567895")]);
+        var saved = Saved();
+
+        await Build().ExecuteAsync(UserId, _product.Id);
+
+        saved.Should().ContainSingle().Which.Reason.Should().Be(CandidateReason.Gtin);
+        _judge.Verify(j => j.JudgeAsync(It.IsAny<Product>(), It.IsAny<IReadOnlyList<OfferSearchResult>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Execute_UsesTheQuerySuggestedByTheJudgeForTheKeywordSearch()
+    {
+        _judge.Setup(j => j.IsAvailable).Returns(true);
+        _judge.Setup(j => j.SuggestSearchQueryAsync(_product)).ReturnsAsync("acer nitro 5 an515-58 16gb");
+        var store = Searcher(ProductSource.MercadoLivre);
+
+        await Build().ExecuteAsync(UserId, _product.Id);
+
+        store.Verify(s => s.SearchByKeywordAsync("acer nitro 5 an515-58 16gb"), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_WithoutASuggestion_FallsBackToTheRulesQuery()
+    {
+        _judge.Setup(j => j.IsAvailable).Returns(true);
+        _judge.Setup(j => j.SuggestSearchQueryAsync(_product)).ReturnsAsync((string?)null);
+        var store = Searcher(ProductSource.MercadoLivre);
+
+        await Build().ExecuteAsync(UserId, _product.Id);
+
+        store.Verify(s => s.SearchByKeywordAsync(It.Is<string>(q => q.Contains("acer"))), Times.Once);
     }
 }

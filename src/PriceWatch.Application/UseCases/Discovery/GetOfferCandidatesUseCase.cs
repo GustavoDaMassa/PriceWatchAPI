@@ -40,7 +40,7 @@ public class GetOfferCandidatesUseCase
                 c.Id, c.ProductId, c.Source,
                 storeNames.GetValueOrDefault(c.Source, c.Source.ToString()),
                 c.Url, c.Name, c.Price, c.ImageUrl, c.Gtin, c.Brand, c.Model, c.Score, c.Reason,
-                Preselected: c.Reason == CandidateReason.Gtin))
+                Preselected: c.Reason == CandidateReason.Gtin, c.AiSaysSame, c.AiReason))
             .ToList();
     }
 }
