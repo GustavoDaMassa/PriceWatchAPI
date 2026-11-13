@@ -47,7 +47,7 @@
 | RNF19 | Buscas externas só por ação do usuário, com limite e cache | API | `DiscoverOffersUseCaseTests.cs`, `DiscoveryFlowTests.cs` (busca uma vez por janela), `PublicAddressPolicyTests.cs` | `RedisDiscoveryGate` (uma busca por produto a cada 6 h, atômica), rate limit por usuário, candidatas em cache no Mongo (24 h) | Implementado (M2/M3) |
 | RNF20 | Cliente não altera a loja; checkout interceptado, não escondido | Extension, Mobile | revisão de código e teste manual | `onShouldStartLoadWithRequest` no app; extensão só injeta o botão | Planejado (Fases E, F) |
 | RI08 | Candidata não é monitorada até confirmação | API | `DiscoveryFlowTests.cs` (comparação só ganha a oferta depois do feedback) | `OfferCandidate` em coleção própria `offer_candidates` | Implementado (M3) |
-| RI09 | Confirmação do usuário resolve o `PendingReview` | API | `ConfirmOfferMatchUseCaseTests.cs` | `ConfirmOfferMatchUseCase`; **voto isolado não anexa oferta a produto compartilhado** (ver `arquitetura.md`, M3) | Implementado (M3) |
+| RI09 | Confirmação do usuário resolve o `PendingReview` | API | `ConfirmOfferMatchUseCaseTests.cs` | `ConfirmOfferMatchUseCase`; **só o próprio usuário decide; a oferta aceita vira produto novo na mesma lista, sem alterar o catálogo compartilhado** (ver `arquitetura.md`, M3) | Implementado (M3) |
 
 ## Notas
 
