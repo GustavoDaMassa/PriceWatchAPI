@@ -15,7 +15,8 @@ public class GetUserProductsUseCase
     public async Task<IEnumerable<TrackedProductResponse>> ExecuteAsync(string userId, string? listId = null)
     {
         var products = await _repository.GetByUserIdAsync(userId, listId);
-        return products.Select(p => new TrackedProductResponse(
+        // os itens mais recentes primeiro
+        return products.OrderByDescending(p => p.CreatedAt).Select(p => new TrackedProductResponse(
             p.Id, p.ListId, p.Name, p.Url, p.ImageUrl, p.Source,
             p.TargetPrice, p.CurrentPrice, p.LowestPrice, p.IsActive, p.NextCheckAt));
     }

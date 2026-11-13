@@ -106,6 +106,22 @@ public abstract class LegacyProductContractTests
     }
 
     [Fact]
+    public async Task GetProducts_ListsTheMostRecentItemFirst()
+    {
+        var client = await NewAuthenticatedClientAsync();
+        var first = await AddProductAsync(client, NewUrl(), 100m);
+        await Task.Delay(20);
+        var second = await AddProductAsync(client, NewUrl(), 100m);
+        await Task.Delay(20);
+        var third = await AddProductAsync(client, NewUrl(), 100m);
+
+        var items = await GetProductsAsync(client);
+
+        items.Select(i => i.GetProperty("id").GetString()).Should().Equal(
+            third.GetProperty("id").GetString(), second.GetProperty("id").GetString(), first.GetProperty("id").GetString());
+    }
+
+    [Fact]
     public async Task GetProducts_ReturnsOnlyTheCallersItems()
     {
         var alice = await NewAuthenticatedClientAsync();

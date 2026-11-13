@@ -61,8 +61,9 @@ public class UnifiedProductCatalogFacade : IProductCatalogFacade
             .GroupBy(o => o.ProductId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // os itens mais recentes primeiro
         var items = new List<TrackedProductResponse>();
-        foreach (var subscription in subscriptions)
+        foreach (var subscription in subscriptions.OrderByDescending(s => s.CreatedAt))
         {
             if (products.TryGetValue(subscription.ProductId, out var product) &&
                 offersByProduct.TryGetValue(subscription.ProductId, out var offers))

@@ -109,6 +109,21 @@ public class UnifiedProductCatalogFacadeTests
     }
 
     [Fact]
+    public async Task GetUserProducts_ListsTheMostRecentSubscriptionFirst()
+    {
+        OffersAre(Offer(1000m, 950m, "https://ml/a"));
+        var now = DateTime.UtcNow;
+        var oldest = UserProductSubscription.Restore("sub-old", UserId, _product.Id, null, 100m, true, false, now.AddDays(-2));
+        var newest = UserProductSubscription.Restore("sub-new", UserId, _product.Id, null, 100m, true, false, now);
+        var middle = UserProductSubscription.Restore("sub-mid", UserId, _product.Id, null, 100m, true, false, now.AddDays(-1));
+        _subscriptions.Setup(r => r.GetByUserIdAsync(UserId, null)).ReturnsAsync(new[] { oldest, newest, middle });
+
+        var items = (await _facade.GetUserProductsAsync(UserId, null)).ToList();
+
+        items.Select(i => i.Id).Should().Equal("sub-new", "sub-mid", "sub-old");
+    }
+
+    [Fact]
     public async Task GetUserProducts_SkipsSubscriptionsWhoseProductHasNoOffers()
     {
         var sub = Subscription();
