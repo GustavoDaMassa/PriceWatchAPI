@@ -41,6 +41,8 @@ services:
       Features__BackfillEnabled: ${FEATURE_BACKFILL_ENABLED:-false}
       Features__MatchingEnabled: ${FEATURE_MATCHING_ENABLED:-false}
       Features__UnifiedCatalogEnabled: ${FEATURE_UNIFIED_CATALOG_ENABLED:-false}
+      Gemini__ApiKey: ${GEMINI_API_KEY:-}
+      Gemini__Model: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
     depends_on:
       - pricewatch-mongo
       - pricewatch-redis
@@ -68,6 +70,8 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: pricewatch-api --interval 30
+    environment:
+      DOCKER_API_VERSION: "1.44"
     restart: unless-stopped
 
 volumes:

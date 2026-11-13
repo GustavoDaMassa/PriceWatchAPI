@@ -57,6 +57,8 @@ services:
       Features__BackfillEnabled: ${FEATURE_BACKFILL_ENABLED:-false}
       Features__MatchingEnabled: ${FEATURE_MATCHING_ENABLED:-false}
       Features__UnifiedCatalogEnabled: ${FEATURE_UNIFIED_CATALOG_ENABLED:-false}
+      Gemini__ApiKey: ${GEMINI_API_KEY:-}
+      Gemini__Model: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
     healthcheck:
       # a imagem aspnet não tem curl/wget: HTTP cru pelo /dev/tcp do bash
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /health/ready HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && head -n1 <&3 | grep -q \" 200 \"'"]
