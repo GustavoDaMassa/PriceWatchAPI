@@ -16,7 +16,8 @@ namespace PriceWatch.Application.UseCases.Discovery;
 /// Roda no máximo uma vez por produto por janela de tempo, compartilhada entre usuários (RNF19).
 /// A "nova busca" (<c>findNew</c>) ignora a janela de 6 horas, mas tem uma pausa curta própria, e traz só o que
 /// ainda não apareceu: ignora candidatas anteriores, o que o usuário já julgou e o que ele já acompanha, e anda
-/// pelas próximas páginas de resultado quando a primeira não tem nada novo.
+/// pelas próximas páginas de resultado quando a primeira não tem nada novo. Depois de 3 novas buscas seguidas sem
+/// nada novo, ela para (<see cref="NoMoreSimilarProductsException"/>) até o contador expirar ou uma achar algo.
 /// </summary>
 public class DiscoverOffersUseCase
 {
@@ -25,6 +26,7 @@ public class DiscoverOffersUseCase
     private const int MaxCandidatesPerStore = 3;
     private const int MaxCandidatesToJudge = 6;
     private const int MaxPagesWhenFindingNew = 3;
+    private const int MaxEmptyNewSearches = 3;
     private static readonly TimeSpan FindNewCooldown = TimeSpan.FromSeconds(45);
 
     private readonly IUserProductSubscriptionRepository _subscriptions;
@@ -65,6 +67,9 @@ public class DiscoverOffersUseCase
         var product = await _products.GetByIdAsync(productId)
             ?? throw new ProductNotFoundException(productId);
 
+        if (findNew && await _gate.CountEmptyRunsAsync(productId) >= MaxEmptyNewSearches)
+            throw new NoMoreSimilarProductsException(productId);
+
         var acquired = findNew
             ? await _gate.TryAcquireAsync($"{productId}:new", FindNewCooldown)
             : await _gate.TryAcquireAsync(productId, DiscoveryWindow);
@@ -78,6 +83,7 @@ public class DiscoverOffersUseCase
         var stores = _searchers.Where(s => s.IsAvailable).ToList();
         var pages = findNew ? MaxPagesWhenFindingNew : 1;
 
+        var savedInTotal = 0;
         for (var page = 0; page < pages; page++)
         {
             // as buscas nas lojas rodam em paralelo; a gravação é sequencial
@@ -88,10 +94,15 @@ public class DiscoverOffersUseCase
             foreach (var (store, results) in found)
                 saved += await SaveCandidatesAsync(product, store.ProductSource, results, excludedUrls);
 
+            savedInTotal += saved;
+
             // achou algo novo, ou as lojas não têm mais resultados: não precisa ir para a página seguinte
             if (saved > 0 || found.All(f => f.Results.Count == 0))
                 break;
         }
+
+        if (findNew)
+            await _gate.RecordNewSearchAsync(productId, foundNew: savedInTotal > 0);
 
         return true;
     }

@@ -34,16 +34,19 @@ public class DiscoveryController : ControllerBase
     /// candidatas já encontradas. Com <c>refresh=true</c> faz uma <b>nova busca</b>: ignora a janela de 6 horas e traz só
     /// o que ainda não apareceu (ignora candidatas anteriores, o que o usuário já julgou e o que ele já acompanha),
     /// andando pelas próximas páginas de resultado se preciso. Há uma pausa de 45 segundos entre novas buscas do mesmo
-    /// produto. Candidatas NÃO são monitoradas até a confirmação.
+    /// produto. Depois de 3 novas buscas seguidas sem nada novo, a API para de aceitar (409) até o contador expirar
+    /// (24 horas) ou alguém achar algo novo. Candidatas NÃO são monitoradas até a confirmação.
     /// </remarks>
     /// <param name="productId">ID do produto-mestre (<c>productId</c> das respostas de oferta e de itens).</param>
     /// <param name="refresh">True para fazer uma nova busca por produtos que ainda não apareceram.</param>
     /// <response code="200">Candidatas que o usuário ainda não julgou (as antigas ainda pendentes e as novas).</response>
     /// <response code="404">O usuário não acompanha este produto.</response>
+    /// <response code="409">Já houve 3 novas buscas seguidas sem nada novo: não há mais produtos parecidos por enquanto.</response>
     /// <response code="429">Nova busca pedida de novo antes da pausa de 45 segundos.</response>
     [HttpPost("/api/products/{productId}/discover")]
     [ProducesResponseType(typeof(IReadOnlyList<OfferCandidateResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Discover(string productId, [FromQuery] bool refresh = false)
     {

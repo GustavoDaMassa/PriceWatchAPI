@@ -451,4 +451,61 @@ public class DiscoverOffersUseCaseTests
 
         saved.Select(c => c.Url).Should().Equal("https://ml/p/MLB41");
     }
+
+    [Fact]
+    public async Task FindNew_AfterThreeEmptyNewSearches_StopsWithoutCallingTheStoresOrTakingTheCooldown()
+    {
+        _gate.Setup(g => g.CountEmptyRunsAsync(_product.Id)).ReturnsAsync(3);
+        var store = Searcher(ProductSource.MercadoLivre, pages: [[Result("https://ml/p/MLB2", AcerTitle)]]);
+
+        var act = () => Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        await act.Should().ThrowAsync<NoMoreSimilarProductsException>();
+        store.Verify(s => s.SearchByKeywordPageAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+        _gate.Verify(g => g.TryAcquireAsync($"{_product.Id}:new", It.IsAny<TimeSpan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task FindNew_WithTwoEmptyNewSearchesSoFar_StillRuns()
+    {
+        _gate.Setup(g => g.CountEmptyRunsAsync(_product.Id)).ReturnsAsync(2);
+        Searcher(ProductSource.MercadoLivre);
+
+        var ran = await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        ran.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task FindNew_ARunWithNothingNew_CountsAsEmpty()
+    {
+        Searcher(ProductSource.MercadoLivre);
+
+        await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        _gate.Verify(g => g.RecordNewSearchAsync(_product.Id, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task FindNew_ARunThatFindsSomethingNew_ResetsTheEmptyCount()
+    {
+        Searcher(ProductSource.MercadoLivre, pages: [[Result("https://ml/p/MLB2", AcerTitle)]]);
+        Saved();
+
+        await Build().ExecuteAsync(UserId, _product.Id, findNew: true);
+
+        _gate.Verify(g => g.RecordNewSearchAsync(_product.Id, true), Times.Once);
+    }
+
+    [Fact]
+    public async Task Execute_ANormalSearch_NeitherCountsNorIsBlockedByEmptyNewSearches()
+    {
+        _gate.Setup(g => g.CountEmptyRunsAsync(_product.Id)).ReturnsAsync(3);
+        Searcher(ProductSource.MercadoLivre);
+
+        var ran = await Build().ExecuteAsync(UserId, _product.Id);
+
+        ran.Should().BeTrue();
+        _gate.Verify(g => g.RecordNewSearchAsync(It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
+    }
 }

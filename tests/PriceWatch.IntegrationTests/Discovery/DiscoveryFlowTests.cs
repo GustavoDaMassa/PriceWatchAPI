@@ -222,6 +222,28 @@ public class DiscoveryFlowTests
     }
 
     [Fact]
+    public async Task ANewSearchThatFindsNothingIsCounted_AndAfterThreeTheApiStopsWith409()
+    {
+        var (client, _) = await NewUserAsync();
+        var productId = await TrackAsync(client, NewMercadoLivreUrl(), NewGtin());
+        var redis = _factory.Services.GetRequiredService<StackExchange.Redis.IConnectionMultiplexer>().GetDatabase();
+        var key = $"discovery:{productId}:empty";
+
+        var empty = await client.PostAsync($"/api/products/{productId}/discover?refresh=true", null);
+
+        empty.StatusCode.Should().Be(HttpStatusCode.OK);
+        ((int)await redis.StringGetAsync(key)).Should().Be(1);
+
+        await redis.StringSetAsync(key, 3);
+        await redis.KeyDeleteAsync($"discovery:{productId}:new");           // sem a pausa de 45 s no caminho
+
+        var blocked = await client.PostAsync($"/api/products/{productId}/discover?refresh=true", null);
+
+        blocked.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await client.PostAsync($"/api/products/{productId}/discover", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task UsersWhoDoNotTrackTheProduct_CannotDiscoverListOrJudgeItsCandidates()
     {
         var (owner, _) = await NewUserAsync();
