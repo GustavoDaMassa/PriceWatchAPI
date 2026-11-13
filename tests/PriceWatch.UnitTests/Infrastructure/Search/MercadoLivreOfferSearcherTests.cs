@@ -88,7 +88,8 @@ public class MercadoLivreOfferSearcherTests
             .Contain("api.mercadolibre.com/products/search")
             .And.Contain("product_identifier=7891234567895")
             .And.Contain("site_id=MLB")
-            .And.Contain("status=active");
+            .And.Contain("status=active")
+            .And.Contain("limit=20");
         request.Headers.Authorization!.Parameter.Should().Be("ml-token");
         results.Should().ContainSingle();
     }
@@ -121,15 +122,15 @@ public class MercadoLivreOfferSearcherTests
     }
 
     [Fact]
-    public async Task Search_ReadsAtMostEightCatalogProducts()
+    public async Task Search_ReadsAtMostTwentyCatalogProducts()
     {
-        var ids = string.Join(",", Enumerable.Range(101, 10).Select(i => $$"""{"id":"MLB{{i}}","name":"P"}"""));
+        var ids = string.Join(",", Enumerable.Range(101, 25).Select(i => $$"""{"id":"MLB{{i}}","name":"P"}"""));
         var searcher = Build($$"""{"results":[{{ids}}]}""");
 
         var results = await searcher.SearchByKeywordAsync("galaxy");
 
-        results.Should().HaveCount(8);
-        _catalogFetcher.Verify(f => f.FetchAsync(It.Is<string>(u => u.EndsWith("MLB109"))), Times.Never);
+        results.Should().HaveCount(20);
+        _catalogFetcher.Verify(f => f.FetchAsync(It.Is<string>(u => u.EndsWith("MLB121"))), Times.Never);
     }
 
     [Fact]

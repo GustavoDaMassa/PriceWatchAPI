@@ -21,8 +21,8 @@ namespace PriceWatch.Infrastructure.Search;
 /// </summary>
 public partial class MercadoLivreOfferSearcher : IOfferSearcher
 {
-    private const int MaxProducts = 8;
-    private const string SearchUrl = "https://api.mercadolibre.com/products/search?status=active&site_id=MLB";
+    private const int MaxProducts = 20;
+    private const string SearchUrl = "https://api.mercadolibre.com/products/search?status=active&site_id=MLB&limit=20";
 
     private readonly HttpClient _httpClient;
     private readonly IMercadoLivreTokenProvider _tokens;
