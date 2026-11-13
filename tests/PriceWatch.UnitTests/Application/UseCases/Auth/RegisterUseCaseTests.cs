@@ -37,6 +37,20 @@ public class RegisterUseCaseTests
     }
 
     [Fact]
+    public async Task Execute_WhenTheVerificationEmailCannotBeSent_StillCreatesTheAccountWithoutFailing()
+    {
+        _userRepo.Setup(r => r.GetByEmailAsync("new@test.com")).ReturnsAsync((User?)null);
+        _hasher.Setup(h => h.Hash("pass123")).Returns("hashed");
+        _emailSender.Setup(s => s.SendVerificationEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ThrowsAsync(new InvalidOperationException("smtp down"));
+
+        var act = async () => await _useCase.ExecuteAsync(new RegisterRequest("Test", "new@test.com", "pass123"));
+
+        await act.Should().NotThrowAsync();
+        _userRepo.Verify(r => r.CreateAsync(It.Is<User>(u => u.Email == "new@test.com")), Times.Once);
+    }
+
+    [Fact]
     public async Task Execute_WithExistingEmail_ShouldThrowBusinessException()
     {
         var existing = User.Create("Existing", "dup@test.com", "h", "t");

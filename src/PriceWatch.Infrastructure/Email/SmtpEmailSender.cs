@@ -1,5 +1,6 @@
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using PriceWatch.Domain.Interfaces.Services;
@@ -10,11 +11,13 @@ namespace PriceWatch.Infrastructure.Email;
 public class SmtpEmailSender : IEmailSender
 {
     private readonly SmtpSettings _settings;
+    private readonly ILogger<SmtpEmailSender> _logger;
     private readonly EmailTemplateRenderer _renderer = new();
 
-    public SmtpEmailSender(IOptions<SmtpSettings> settings)
+    public SmtpEmailSender(IOptions<SmtpSettings> settings, ILogger<SmtpEmailSender> logger)
     {
         _settings = settings.Value;
+        _logger = logger;
     }
 
     public async Task SendVerificationEmailAsync(string email, string name, string token, string locale = "en")
@@ -52,7 +55,21 @@ public class SmtpEmailSender : IEmailSender
         await SendAsync(email, subject, html);
     }
 
+    // registra a falha (sem o endereço do destinatário) e a repassa: quem chama decide se ela derruba a operação
     private async Task SendAsync(string to, string subject, string htmlBody)
+    {
+        try
+        {
+            await SendCoreAsync(to, subject, htmlBody);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send the email \"{Subject}\" through {Host}:{Port}.", subject, _settings.Host, _settings.Port);
+            throw;
+        }
+    }
+
+    private async Task SendCoreAsync(string to, string subject, string htmlBody)
     {
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse(_settings.From));

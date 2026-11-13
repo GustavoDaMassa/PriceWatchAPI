@@ -33,6 +33,15 @@ public class RegisterUseCase
         var user = User.Create(request.Name, request.Email, passwordHash, verificationToken, request.Locale);
 
         await _userRepository.CreateAsync(user);
-        await _emailSender.SendVerificationEmailAsync(user.Email, user.Name, verificationToken, user.Locale);
+
+        try
+        {
+            await _emailSender.SendVerificationEmailAsync(user.Email, user.Name, verificationToken, user.Locale);
+        }
+        catch (Exception)
+        {
+            // a conta já existe: um e-mail que não saiu (o envio registra o erro) não pode virar erro 500 no cadastro;
+            // a pessoa pede o reenvio da verificação
+        }
     }
 }
